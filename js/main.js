@@ -10,7 +10,7 @@ import { HUD } from './hud.js';
 import { Match } from './match.js';
 import { AudioSys } from './audio.js?v=2';
 import { initAuth, getProfile } from './auth.js?v=1';
-import { getSavedProfile, loginWithUsername, loadPlayerData, savePlayerData, lookupPlayerByUsername, loadLeaderboard } from './firebase.js?v=1';
+import { getSavedProfile, loginWithUsername, loadPlayerData, savePlayerData, lookupPlayerByUsername, loadLeaderboard, loadPlayerMail, claimMail, loadEvents } from './firebase.js?v=1';
 
 const $ = (s) => document.querySelector(s);
 const clamp = THREE.MathUtils.clamp;
@@ -1014,18 +1014,36 @@ function generateMailRewards() {
   }
   savePanelData();
 }
-function populateMail() {
+async function populateMail() {
   const list = document.getElementById('mailList');
+  list.innerHTML = '<div class="panel-note" style="margin-top:20px;">Loading mail...</div>';
+  const profile = getSavedProfile();
+  let mails = [];
+  if (profile && profile.uid) {
+    mails = await loadPlayerMail(profile.uid);
+  }
+  // merge with local panelData.mail (dedupe by id/_key)
+  const seen = new Set();
+  const merged = [];
+  for (const m of mails) { const k = m._key || m.id; if (seen.has(k)) continue; seen.add(k); merged.push(m); }
+  for (const m of panelData.mail) { const k = m._key || m.id; if (seen.has(k)) continue; seen.add(k); merged.push(m); }
+  panelData.mail = merged;
+
   list.innerHTML = '';
-  panelData.mail.forEach((m) => {
+  if (merged.length === 0) {
+    list.innerHTML = '<div class="panel-note" style="margin-top:20px;">No mail. Check back later.</div>';
+  }
+  merged.forEach((m, idx) => {
     const row = document.createElement('div');
     row.className = 'mail-item';
     row.innerHTML = `<div style="flex:1"><div class="mail-title">${m.title}</div><div class="mail-desc">${m.desc}</div></div><div class="mail-reward">${m.reward}</div><button class="btn ghost" style="min-width:70px;padding:6px 10px;font-size:9px;" ${m.claimed ? 'disabled' : ''}>${m.claimed ? 'CLAIMED' : 'CLAIM'}</button>`;
     const btn = row.querySelector('button');
     if (!m.claimed) {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         m.claimed = true;
-        panelData.coins += 50;
+        const rewardCoins = m.rewardCoins || parseInt((m.reward || '0').replace(/[^0-9]/g, ''), 10) || 50;
+        panelData.coins += rewardCoins;
+        if (profile && profile.uid && m._key) await claimMail(profile.uid, m._key);
         savePanelData();
         refreshCoins();
         populateMail();
@@ -1035,7 +1053,7 @@ function populateMail() {
     }
     list.appendChild(row);
   });
-  document.getElementById('mailCount').textContent = panelData.mail.filter((m) => !m.claimed).length + ' UNREAD';
+  document.getElementById('mailCount').textContent = merged.filter((m) => !m.claimed).length + ' UNREAD';
 }
 
 // ---- FRIENDS ----
@@ -1095,17 +1113,26 @@ function populateShop() {
 }
 
 // ---- EVENTS ----
-function populateEvents() {
+async function populateEvents() {
   const list = document.getElementById('eventsList');
+  list.innerHTML = '<div class="panel-note" style="margin-top:20px;">Loading events...</div>';
+  const fbEvents = await loadEvents();
+  if (fbEvents.length > 0) {
+    // merge: keep claimed state from panelData
+    const claimed = new Set(panelData.events.filter((e) => e.claimed).map((e) => e.id));
+    panelData.events = fbEvents.map((e) => ({ ...e, claimed: claimed.has(e.id) }));
+  }
   list.innerHTML = '';
   const s = panelData.stats;
   panelData.events.forEach((ev) => {
     let progress = '';
     let claimable = false;
-    if (ev.id === 'e1') { progress = 'ACTIVE NOW'; claimable = true; }
-    else if (ev.id === 'e2') { progress = s.wins >= 1 ? 'COMPLETE' : 'WIN A MATCH'; claimable = s.wins >= 1; }
-    else if (ev.id === 'e3') { progress = (s.bestKills || 0) + ' / 5 KILLS'; claimable = (s.bestKills || 0) >= 5; }
-    else if (ev.id === 'e4') { progress = Math.floor(s.surviveSec / 60) + ' / 10 MIN'; claimable = s.surviveSec >= 600; }
+    if (ev.condition === 'always' || ev.id === 'e1') { progress = 'ACTIVE NOW'; claimable = true; }
+    else if (ev.condition === 'win' || ev.id === 'e2') { progress = s.wins >= 1 ? 'COMPLETE' : 'WIN A MATCH'; claimable = s.wins >= 1; }
+    else if (ev.condition === 'kills5' || ev.id === 'e3') { progress = (s.bestKills || 0) + ' / 5 KILLS'; claimable = (s.bestKills || 0) >= 5; }
+    else if (ev.condition === 'survive10' || ev.id === 'e4') { progress = Math.floor(s.surviveSec / 60) + ' / 10 MIN'; claimable = s.surviveSec >= 600; }
+    else if (ev.condition === 'matches10') { progress = s.matches + ' / 10 MATCHES'; claimable = s.matches >= 10; }
+    else { progress = 'ACTIVE'; claimable = true; }
     const row = document.createElement('div');
     row.className = 'event-item';
     row.innerHTML = `<div style="flex:1"><div class="event-title">${ev.name}</div><div class="event-desc">${ev.desc}</div><div style="font-size:8px;color:#7ee08a;margin-top:3px;">${progress}</div></div><div class="mail-reward">${ev.reward}</div><button class="btn ${ev.claimed ? 'ghost' : (claimable ? 'primary' : 'ghost')}" style="min-width:70px;padding:6px 10px;font-size:9px;" ${ev.claimed || !claimable ? 'disabled' : ''}>${ev.claimed ? 'CLAIMED' : (claimable ? 'CLAIM' : 'LOCKED')}</button>`;
@@ -1123,7 +1150,10 @@ function populateEvents() {
     }
     list.appendChild(row);
   });
-  document.getElementById('eventsCount').textContent = panelData.events.filter((e) => e.active).length + ' ACTIVE';
+  if (panelData.events.length === 0) {
+    list.innerHTML = '<div class="panel-note" style="margin-top:20px;">No active events.</div>';
+  }
+  document.getElementById('eventsCount').textContent = panelData.events.filter((e) => e.active !== false).length + ' ACTIVE';
 }
 
 // ---- CLAN ----
@@ -1875,10 +1905,11 @@ function beginMultiplayerMatch() {
 }
 
 function syncRemotePlayers(state) {
-  if (!state || !match) return;
+  if (!state || !match || !gameRoom) return;
   const seen = new Set();
+  const myId = gameRoom && gameRoom.sessionId ? gameRoom.sessionId : null;
   state.players.forEach((p, id) => {
-    if (id === gameRoom.sessionId || p.isBot) return;
+    if (id === myId || p.isBot) return;
     seen.add(id);
     let entry = remoteFighters.get(id);
     if (!entry) {
