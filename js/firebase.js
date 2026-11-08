@@ -146,6 +146,13 @@ export async function loadLeaderboard(limit = 20) {
     return [];
   }
 }
+async function withTimeout(promise, ms = 6000) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
 export async function loadPlayerMail(uid) {
   let bundle;
   try { bundle = await ensureFirebase(); } catch { return []; }
@@ -153,7 +160,7 @@ export async function loadPlayerMail(uid) {
   try {
     const mails = [];
     // personal mail
-    const personalSnap = await mod.get(mod.ref(db, `${DB_ROOT}/mail/${uid}`));
+    const personalSnap = await withTimeout(mod.get(mod.ref(db, `${DB_ROOT}/mail/${uid}`)));
     if (personalSnap.exists()) {
       personalSnap.forEach((child) => {
         const v = child.val();
@@ -161,7 +168,7 @@ export async function loadPlayerMail(uid) {
       });
     }
     // global mail
-    const globalSnap = await mod.get(mod.ref(db, `${DB_ROOT}/mail/global`));
+    const globalSnap = await withTimeout(mod.get(mod.ref(db, `${DB_ROOT}/mail/global`)));
     if (globalSnap.exists()) {
       globalSnap.forEach((child) => {
         const v = child.val();
@@ -169,7 +176,7 @@ export async function loadPlayerMail(uid) {
       });
     }
     // check claimed state per player
-    const claimedSnap = await mod.get(mod.ref(db, `${DB_ROOT}/mailClaimed/${uid}`));
+    const claimedSnap = await withTimeout(mod.get(mod.ref(db, `${DB_ROOT}/mailClaimed/${uid}`)));
     const claimed = claimedSnap.exists() ? claimedSnap.val() : {};
     mails.forEach((m) => { if (claimed[m._key]) m.claimed = true; });
     return mails;
@@ -197,7 +204,7 @@ export async function loadEvents() {
   try { bundle = await ensureFirebase(); } catch { return []; }
   const { db, mod } = bundle;
   try {
-    const snap = await mod.get(mod.ref(db, `${DB_ROOT}/events`));
+    const snap = await withTimeout(mod.get(mod.ref(db, `${DB_ROOT}/events`)));
     if (!snap.exists()) return [];
     const events = [];
     snap.forEach((child) => {
