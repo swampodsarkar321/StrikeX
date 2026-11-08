@@ -825,8 +825,8 @@ body.touch.in-match .touch-ui { display: block; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(4, 8, 12, 0.8);
-  backdrop-filter: blur(6px);
+  background: rgba(4, 8, 12, 0.97);
+  backdrop-filter: blur(10px);
 }
 
 .end-card {
@@ -3169,5 +3169,14 @@ body:not(.in-match) #game {
   letter-spacing: 0.14em;
   color: rgba(190, 208, 222, 0.6);
   margin-top: 4px;
+}
+
+
+.end-countdown {
+  margin: 12px 0 18px;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: rgba(190, 208, 222, 0.55);
+  text-transform: uppercase;
 }
 
