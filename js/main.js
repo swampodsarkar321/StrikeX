@@ -1859,7 +1859,17 @@ async function startMatchmaking() {
       const entry = remoteFighters.get(msg.targetId);
       if (entry && entry.fighter.alive) {
         const res = entry.fighter.applyDamage(msg.amount || 0);
-        if (res.died) match.killFighter(entry.fighter, null);
+        if (res.died) {
+          // find killer fighter by session id for kill feed
+          let killerFighter = null;
+          const killerId = msg.killer;
+          if (killerId === gameRoom.sessionId) killerFighter = match.player;
+          else {
+            const kEntry = remoteFighters.get(killerId);
+            if (kEntry) killerFighter = kEntry.fighter;
+          }
+          match.killFighter(entry.fighter, killerFighter);
+        }
       }
     }
   });
