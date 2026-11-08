@@ -1,6 +1,6 @@
 # dependencies
 node_modules/
-server/node_modules/
+server/
 
 # logs & temp
 *.log
@@ -15,6 +15,10 @@ desktop.ini
 # editor
 .vscode/
 .idea/
+
+# python
+__pycache__/
+*.pyc
 
 # unused heavy assets (not referenced by the game)
 bmw-m4-liberty.3840x2160.mp4
