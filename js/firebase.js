@@ -146,6 +146,70 @@ export async function loadLeaderboard(limit = 20) {
     return [];
   }
 }
+export async function loadPlayerMail(uid) {
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return []; }
+  const { db, mod } = bundle;
+  try {
+    const mails = [];
+    // personal mail
+    const personalSnap = await mod.get(mod.ref(db, `${DB_ROOT}/mail/${uid}`));
+    if (personalSnap.exists()) {
+      personalSnap.forEach((child) => {
+        const v = child.val();
+        if (v) mails.push({ ...v, _key: child.key, _path: `${DB_ROOT}/mail/${uid}/${child.key}` });
+      });
+    }
+    // global mail
+    const globalSnap = await mod.get(mod.ref(db, `${DB_ROOT}/mail/global`));
+    if (globalSnap.exists()) {
+      globalSnap.forEach((child) => {
+        const v = child.val();
+        if (v) mails.push({ ...v, _key: child.key, _path: `${DB_ROOT}/mail/global/${child.key}` });
+      });
+    }
+    // check claimed state per player
+    const claimedSnap = await mod.get(mod.ref(db, `${DB_ROOT}/mailClaimed/${uid}`));
+    const claimed = claimedSnap.exists() ? claimedSnap.val() : {};
+    mails.forEach((m) => { if (claimed[m._key]) m.claimed = true; });
+    return mails;
+  } catch (err) {
+    console.warn('[StrikeX] loadPlayerMail failed', err);
+    return [];
+  }
+}
+
+export async function claimMail(uid, mailKey, path) {
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return false; }
+  const { db, mod } = bundle;
+  try {
+    await mod.set(mod.ref(db, `${DB_ROOT}/mailClaimed/${uid}/${mailKey}`), true);
+    return true;
+  } catch (err) {
+    console.warn('[StrikeX] claimMail failed', err);
+    return false;
+  }
+}
+
+export async function loadEvents() {
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return []; }
+  const { db, mod } = bundle;
+  try {
+    const snap = await mod.get(mod.ref(db, `${DB_ROOT}/events`));
+    if (!snap.exists()) return [];
+    const events = [];
+    snap.forEach((child) => {
+      const v = child.val();
+      if (v) events.push({ id: child.key, ...v });
+    });
+    return events;
+  } catch (err) {
+    console.warn('[StrikeX] loadEvents failed', err);
+    return [];
+  }
+}
 export async function lookupPlayerByUsername(rawName) {
   const name = String(rawName || '').trim().replace(/\s+/g, '');
   if (!/^[A-Za-z0-9_.]{3,16}$/.test(name)) return null;

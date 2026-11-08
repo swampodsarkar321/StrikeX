@@ -1,0 +1,30 @@
+name: Keep Server Alive
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # every 5 minutes
+  workflow_dispatch:  # manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render server
+        id: ping
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://server-dhrz.onrender.com/ || echo "000")
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "Server returned HTTP $STATUS"
+          if [ "$STATUS" = "000" ]; then
+            echo "Server unreachable"
+            exit 1
+          fi
+
+      - name: Report to Firebase (optional)
+        if: always()
+        run: |
+          curl -s -X PATCH \
+            -H "Content-Type: application/json" \
+            -d "{\"lastPing\":$(date +%s)000,\"status\":\"${{ steps.ping.outputs.status }}\",\"ok\":true}" \
+            "https://strikex-29776-default-rtdb.asia-southeast1.firebasedatabase.app/strikex/serverStatus.json" \
+            || echo "Firebase report failed (non-critical)"

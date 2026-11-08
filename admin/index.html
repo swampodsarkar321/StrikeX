@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>StrikeX Admin Panel</title>
+<link rel="stylesheet" href="./admin.css" />
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js",
+    "firebase/database": "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-kicker">STRIKEX · ADMIN</div>
+    <div class="login-logo">ADMIN PANEL</div>
+    <h2>ADMIN LOGIN</h2>
+    <p class="login-copy">Enter admin password to access the control panel.</p>
+    <label class="login-label" for="adminPass">PASSWORD</label>
+    <input id="adminPass" class="login-input" type="password" autocomplete="off" spellcheck="false" placeholder="••••••••" />
+    <div id="loginMsg" class="login-msg">ENTER ADMIN PASSWORD</div>
+    <button id="loginBtn" class="login-btn">
+      <span class="login-btn-shine"></span>
+      <b>ENTER PANEL</b>
+    </button>
+  </div>
+</div>
+
+<div id="dashboard" class="dashboard hidden">
+  <header class="dash-top">
+    <div class="dash-brand">STRIKEX <em>ADMIN</em></div>
+    <div class="dash-status">
+      <span id="serverStatus" class="status-dot offline"></span>
+      <span id="serverStatusText">CHECKING...</span>
+    </div>
+    <button id="logoutBtn" class="btn ghost" style="min-width:80px;padding:8px 16px;">LOGOUT</button>
+  </header>
+
+  <nav class="dash-nav">
+    <button class="dash-tab active" data-tab="overview">OVERVIEW</button>
+    <button class="dash-tab" data-tab="players">PLAYERS</button>
+    <button class="dash-tab" data-tab="mail">SEND MAIL</button>
+    <button class="dash-tab" data-tab="events">EVENTS</button>
+    <button class="dash-tab" data-tab="server">SERVER</button>
+  </nav>
+
+  <main class="dash-main">
+    <!-- OVERVIEW -->
+    <section class="dash-section active" data-section="overview">
+      <div class="stat-grid">
+        <div class="stat-card"><span class="stat-label">TOTAL PLAYERS</span><b id="ovPlayers">0</b></div>
+        <div class="stat-card"><span class="stat-label">ONLINE NOW</span><b id="ovOnline">0</b></div>
+        <div class="stat-card"><span class="stat-label">TOTAL MATCHES</span><b id="ovMatches">0</b></div>
+        <div class="stat-card"><span class="stat-label">SERVER STATUS</span><b id="ovServer">—</b></div>
+        <div class="stat-card"><span class="stat-label">LAST PING</span><b id="ovPing">—</b></div>
+        <div class="stat-card"><span class="stat-label">ACTIVE EVENTS</span><b id="ovEvents">0</b></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">RECENT ACTIVITY</div>
+        <div id="ovActivity" class="activity-list"></div>
+      </div>
+    </section>
+
+    <!-- PLAYERS -->
+    <section class="dash-section" data-section="players">
+      <div class="toolbar">
+        <input id="playerSearch" class="login-input" placeholder="SEARCH USERNAME" />
+        <button id="refreshPlayers" class="btn primary" style="min-width:100px;padding:10px 16px;">REFRESH</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>USERNAME</th><th>LEVEL</th><th>RANK RP</th><th>ONLINE</th><th>LAST SEEN</th><th>ACTIONS</th></tr></thead>
+          <tbody id="playerTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEND MAIL -->
+    <section class="dash-section" data-section="mail">
+      <div class="mail-form">
+        <div class="form-row">
+          <label>RECIPIENT</label>
+          <select id="mailRecipient" class="login-input">
+            <option value="all">ALL PLAYERS</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>TITLE</label>
+          <input id="mailTitle" class="login-input" placeholder="MAIL TITLE" maxlength="40" />
+        </div>
+        <div class="form-row">
+          <label>MESSAGE</label>
+          <textarea id="mailBody" class="login-input" placeholder="MESSAGE BODY" rows="3"></textarea>
+        </div>
+        <div class="form-row">
+          <label>REWARD (COINS)</label>
+          <input id="mailReward" class="login-input" type="number" value="100" min="0" max="10000" />
+        </div>
+        <button id="sendMailBtn" class="btn primary" style="min-width:140px;padding:12px 24px;">SEND MAIL</button>
+        <div id="mailStatus" class="status-msg"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">SENT MAIL LOG</div>
+        <div id="mailLog" class="activity-list"></div>
+      </div>
+    </section>
+
+    <!-- EVENTS -->
+    <section class="dash-section" data-section="events">
+      <div class="mail-form">
+        <div class="form-row">
+          <label>EVENT NAME</label>
+          <input id="eventName" class="login-input" placeholder="EVENT NAME" maxlength="40" />
+        </div>
+        <div class="form-row">
+          <label>DESCRIPTION</label>
+          <textarea id="eventDesc" class="login-input" placeholder="EVENT DESCRIPTION" rows="2"></textarea>
+        </div>
+        <div class="form-row">
+          <label>REWARD</label>
+          <input id="eventReward" class="login-input" placeholder="e.g. 500 COINS" maxlength="30" />
+        </div>
+        <div class="form-row">
+          <label>CONDITION</label>
+          <select id="eventCondition" class="login-input">
+            <option value="always">ALWAYS (claimable)</option>
+            <option value="win">WIN A MATCH</option>
+            <option value="kills5">GET 5 KILLS</option>
+            <option value="survive10">SURVIVE 10 MIN</option>
+            <option value="matches10">PLAY 10 MATCHES</option>
+          </select>
+        </div>
+        <button id="addEventBtn" class="btn primary" style="min-width:140px;padding:12px 24px;">ADD EVENT</button>
+        <div id="eventStatus" class="status-msg"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">ACTIVE EVENTS</div>
+        <div id="eventList" class="activity-list"></div>
+      </div>
+    </section>
+
+    <!-- SERVER -->
+    <section class="dash-section" data-section="server">
+      <div class="stat-grid">
+        <div class="stat-card"><span class="stat-label">SERVER URL</span><b style="font-size:12px;">server-dhrz.onrender.com</b></div>
+        <div class="stat-card"><span class="stat-label">STATUS</span><b id="srvStatus">—</b></div>
+        <div class="stat-card"><span class="stat-label">LAST PING</span><b id="srvPing">—</b></div>
+        <div class="stat-card"><span class="stat-label">LAST STATUS CODE</span><b id="srvCode">—</b></div>
+      </div>
+      <button id="pingServerBtn" class="btn primary" style="min-width:140px;padding:12px 24px;margin-top:14px;">PING NOW</button>
+      <div class="panel" style="margin-top:18px;">
+        <div class="panel-head">SERVER LOG</div>
+        <div id="serverLog" class="activity-list"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="./admin.js"></script>
+</body>
+</html>
