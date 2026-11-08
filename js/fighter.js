@@ -305,6 +305,11 @@ export class Fighter {
     this.gun.visible = false;
     scene.add(this.gun);
 
+    // emote state
+    this.emoteT = 0;
+    this.emoteId = null;
+    this.emoteSprite = null;
+
     // hit volumes
     this.hitboxes = [];
     const hbMat = new THREE.MeshBasicMaterial({ visible: false });
@@ -381,6 +386,7 @@ export class Fighter {
   update(dt) {
     this.updateLocomotion(dt);
     this.mixer.update(dt);
+    this.updateEmote(dt);
     const groundY = terrainHeight(this.pos.x, this.pos.z) + (this.yOffset || 0);
     this.root.position.set(this.pos.x, groundY, this.pos.z);
     this.pos.y = groundY;
@@ -449,6 +455,48 @@ export class Fighter {
 
   heal(amount) { this.health = Math.min(this.maxHealth, this.health + amount); }
   addShield(amount) { this.shield = Math.min(this.maxShield, this.shield + amount); }
+
+  // ------------------------------------------------------------ emotes
+  playEmote(id) {
+    if (!this.alive || this.emoteT > 0) return;
+    this.emoteId = id || 'wave';
+    this.emoteT = 2.2; // seconds
+    // create floating text sprite
+    if (this.emoteSprite) { this.root.remove(this.emoteSprite); this.emoteSprite = null; }
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const g = c.getContext('2d');
+    g.font = 'bold 42px Bahnschrift, Trebuchet MS, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.shadowColor = 'rgba(0,0,0,0.8)';
+    g.shadowBlur = 6;
+    g.fillStyle = '#ffb648';
+    g.fillText((this.emoteId || 'EMOTE').toUpperCase(), 128, 32);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+    this.emoteSprite = new THREE.Sprite(mat);
+    this.emoteSprite.scale.set(2.2, 0.55, 1);
+    this.emoteSprite.position.y = 2.2;
+    this.root.add(this.emoteSprite);
+  }
+
+  updateEmote(dt) {
+    if (this.emoteT <= 0) return;
+    this.emoteT -= dt;
+    // bob and pulse while emote is active
+    const bob = Math.sin((2.2 - this.emoteT) * 8) * 0.15;
+    this.root.position.y = terrainHeight(this.pos.x, this.pos.z) + (this.yOffset || 0) + bob;
+    if (this.emoteSprite) {
+      this.emoteSprite.position.y = 2.2 + Math.sin((2.2 - this.emoteT) * 4) * 0.2;
+    }
+    if (this.emoteT <= 0) {
+      this.emoteT = 0;
+      this.emoteId = null;
+      if (this.emoteSprite) { this.root.remove(this.emoteSprite); this.emoteSprite = null; }
+    }
+  }
 }
 
 function makeNameTag(name, color) {

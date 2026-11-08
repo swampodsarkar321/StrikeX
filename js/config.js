@@ -201,8 +201,21 @@ export const GLOO_HP = 600;
 export const GLOO_TTL = 25;
 
 // ------------------------------------------------------------------
-//  airdrops
+//  emotes
 // ------------------------------------------------------------------
+export const EMOTES = [
+  { id: 'wave',    name: 'WAVE',      price: 300, anim: 'wave' },
+  { id: 'dance',   name: 'DANCE',     price: 500, anim: 'dance' },
+  { id: 'taunt',   name: 'TAUNT',     price: 400, anim: 'taunt' },
+  { id: 'salute',  name: 'SALUTE',    price: 350, anim: 'salute' },
+  { id: 'laugh',   name: 'LAUGH',     price: 450, anim: 'laugh' },
+  { id: 'point',   name: 'POINT',     price: 250, anim: 'point' },
+  { id: 'clap',    name: 'CLAP',      price: 300, anim: 'clap' },
+  { id: 'hype',    name: 'HYPE',      price: 600, anim: 'hype' },
+];
+
+export const COIN_REWARD_BASE = 500;
+export const COIN_PLACEMENT = { 1: 1000, 2: 800, 3: 800 };  // #1: 1000, #2-3: 800, others: 500 base
 export const AIRDROP_LOOT = ['sniper2', 'sniper3', 'sniper4', 'assault2', 'bullpup', 'shotgun2'];
 export const AIRDROP_TIMES = [25, 75, 125];     // match seconds at which crates drop
 

@@ -403,6 +403,7 @@ export class HUD {
       ${stats.rank ? `<div><span>RANK</span><b>${stats.rank}</b></div>` : ''}
       ${stats.xpGain !== undefined ? `<div><span>XP GAINED</span><b>+${stats.xpGain} XP</b></div>` : ''}
       ${stats.level ? `<div><span>LEVEL</span><b>LV. ${stats.level}</b></div>` : ''}
+      ${stats.coins !== undefined ? `<div><span>COINS EARNED</span><b>+${stats.coins}</b></div>` : ''}
     `;
   }
 }

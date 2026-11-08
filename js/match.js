@@ -7,6 +7,7 @@ import {
   BOT_NAMES, LOOT_DEFS, MAP_SCALE, MAX_PLAYERS,
   CHAR_ABILITIES, EP_MAX, GLOO_START, GLOO_HP, GLOO_TTL,
   AIRDROP_LOOT, AIRDROP_TIMES,
+  EMOTES, COIN_REWARD_BASE, COIN_PLACEMENT,
 } from './config.js';
 import { Fighter, createGun } from './fighter.js?v=4';
 import {
@@ -48,7 +49,7 @@ function disposeObjectResources(root, keepGeometry = false) {
 }
 
 export class Match {
-  constructor({ scene, world, audio, effects, hud, camera, charId, onEnd, net = null, humanCount = 1, startWeapon = 'pistol', ranked = false, rankName = 'BRONZE V' }) {
+  constructor({ scene, world, audio, effects, hud, camera, charId, onEnd, net = null, humanCount = 1, startWeapon = 'pistol', ranked = false, rankName = 'BRONZE V', equippedEmote = null }) {
     this.scene = scene;
     this.world = world;
     this.audio = audio;
@@ -62,6 +63,7 @@ export class Match {
     this.startWeapon = WEAPONS[startWeapon] ? startWeapon : 'pistol';
     this.ranked = !!ranked;
     this.rankName = rankName;
+    this.equippedEmote = equippedEmote || null;
 
     this.fighters = [];
     this.bots = [];
@@ -74,6 +76,8 @@ export class Match {
     this.glooCount = GLOO_START;
     this.abilityCd = 0;
     this.abilityActive = 0;
+    this.emoteCd = 0;
+    this.emoteId = null;
     this.luckyShots = 0;
     this.firstBloodDone = false;
     this.streak = 0;
@@ -557,6 +561,7 @@ export class Match {
   // ----------------------------------------------------------- abilities
   updateAbility(dt) {
     this.abilityCd = Math.max(0, this.abilityCd - dt);
+    this.emoteCd = Math.max(0, this.emoteCd - dt);
     if (this.abilityActive > 0) {
       this.abilityActive -= dt;
       if (this.abilityActive <= 0) {
@@ -574,6 +579,16 @@ export class Match {
       m.transparent = on ? true : (m.userData.baseOpacity < 1);
       m.opacity = on ? 0.35 : m.userData.baseOpacity;
     }
+  }
+
+  useEmote(id) {
+    const p = this.player;
+    if (!p.alive || this.over) return;
+    if (this.emoteCd > 0) { this.hud.toast('EMOTE ON COOLDOWN', 'warn'); return; }
+    this.emoteCd = 1.3;
+    const emoteId = id || this.equippedEmote || 'wave';
+    p.playEmote(emoteId);
+    if (this.net) this.net.send('emote', { id: emoteId });
   }
 
   useAbility() {
@@ -1140,6 +1155,17 @@ export class Match {
       stats.rp = rp;
       stats.rank = this.rankName;
     }
+    // coin reward: base + placement bonus + rank bonus
+    let coins = COIN_REWARD_BASE;
+    if (placement === 1) coins = 1000;
+    else if (placement <= 3) coins = 800;
+    else if (placement <= 5) coins = 650;
+    // rank tier bonus (from rankName)
+    const tier = this.rankName || 'BRONZE V';
+    if (/DIAMOND|HEROIC|PLATINUM/.test(tier)) coins += 400;
+    else if (/GOLD/.test(tier)) coins += 200;
+    else if (/SILVER/.test(tier)) coins += 100;
+    stats.coins = coins;
     this.hud.showEnd(win, stats);
     if (win) this.audio.win();
     else this.audio.death();

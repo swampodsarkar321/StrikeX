@@ -932,8 +932,14 @@ let panelData = {
     { id: 'skin_arctic', name: 'ARCTIC SKIN', price: 500, type: 'skin', owned: false },
     { id: 'skin_neon', name: 'NEON BLADE', price: 800, type: 'skin', owned: false },
     { id: 'skin_gold', name: 'GOLDEN AR', price: 1200, type: 'skin', owned: false },
-    { id: 'emote_dance', name: 'DANCE EMOTE', price: 300, type: 'emote', owned: false },
-    { id: 'emote_taunt', name: 'TAUNT EMOTE', price: 200, type: 'emote', owned: false },
+    { id: 'emote_wave', name: 'WAVE EMOTE', price: 300, type: 'emote', anim: 'wave', owned: false },
+    { id: 'emote_dance', name: 'DANCE EMOTE', price: 500, type: 'emote', anim: 'dance', owned: false },
+    { id: 'emote_taunt', name: 'TAUNT EMOTE', price: 400, type: 'emote', anim: 'taunt', owned: false },
+    { id: 'emote_salute', name: 'SALUTE EMOTE', price: 350, type: 'emote', anim: 'salute', owned: false },
+    { id: 'emote_laugh', name: 'LAUGH EMOTE', price: 450, type: 'emote', anim: 'laugh', owned: false },
+    { id: 'emote_point', name: 'POINT EMOTE', price: 250, type: 'emote', anim: 'point', owned: false },
+    { id: 'emote_clap', name: 'CLAP EMOTE', price: 300, type: 'emote', anim: 'clap', owned: false },
+    { id: 'emote_hype', name: 'HYPE EMOTE', price: 600, type: 'emote', anim: 'hype', owned: false },
     { id: 'banner_fire', name: 'FIRE BANNER', price: 400, type: 'banner', owned: false },
   ],
   events: [
@@ -942,6 +948,7 @@ let panelData = {
     { id: 'e3', name: 'KILL STREAK CHALLENGE', desc: 'Get a 5-kill streak.', reward: '500 COINS', claimed: false, active: true },
     { id: 'e4', name: 'SURVIVOR', desc: 'Survive 10 minutes in a single match.', reward: '300 COINS', claimed: false, active: true },
   ],
+  equippedEmote: null,
   luckResult: 'SPIN TO WIN!',
 };
 
@@ -1099,7 +1106,13 @@ function populateShop() {
         if (panelData.coins < item.price) { hud.toast('NOT ENOUGH COINS', 'warn'); return; }
         panelData.coins -= item.price;
         item.owned = true;
-        panelData.vault.push(item.id);
+        if (item.type === 'emote') {
+          panelData.equippedEmote = item.anim || item.id;
+          hud.toast('EQUIPPED: ' + item.name, 'good');
+        } else {
+          panelData.vault.push(item.id);
+          hud.toast(item.name + ' PURCHASED', 'good');
+        }
         savePanelData();
         refreshCoins();
         populateShop();
@@ -1596,6 +1609,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') match.pickup();
   if (e.code === 'KeyF') match.useAbility();
   if (e.code === 'KeyG') match.placeGloo(controls);
+  if (e.code === 'KeyV') match.useEmote(match.equippedEmote);
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => {
@@ -1745,6 +1759,7 @@ document.querySelectorAll('.tbtn').forEach((btn) => {
     if (action === 'jump') controls.jump = true;
     if (action === 'ability') match.useAbility();
     if (action === 'gloo') match.placeGloo(controls);
+    if (action === 'emote') match.useEmote(match.equippedEmote);
   };
   const up = (e) => {
     e.preventDefault();
@@ -1892,6 +1907,16 @@ async function startMatchmaking() {
   });
 
   gameRoom.onMessage('shot', () => { /* remote tracer handled server-side */ });
+  gameRoom.onMessage('emote', (msg) => {
+    if (!msg || !match) return;
+    const id = msg.id || 'wave';
+    const shooterId = msg.shooter;
+    if (!shooterId) return;
+    // local Fighter
+    if (shooterId === gameRoom.sessionId) { match.player.playEmote(id); return; }
+    const entry = remoteFighters.get(shooterId);
+    if (entry && entry.fighter) entry.fighter.playEmote(id);
+  });
   gameRoom.onMessage('matchStart', (msg) => {
     if (!startedFromMm) { startedFromMm = true; beginMultiplayerMatch(); }
   });
@@ -1997,6 +2022,7 @@ function startMatch() {
     scene, world, audio, effects, hud, camera,
     charId: selected,
     startWeapon: selectedWeapon,
+    equippedEmote: panelData.equippedEmote || null,
     ranked: rankedMode,
     rankName: rankFor(rankState.rp),
     net: gameRoom,
@@ -2024,6 +2050,13 @@ function startMatch() {
 
       // ---- update lobby stats (matches, kills, damage, etc.) ----
       if (window.__updateStatsAfterMatch) window.__updateStatsAfterMatch(stats);
+
+      // ---- award coins for match completion ----
+      if (stats.coins) {
+        panelData.coins += stats.coins;
+        savePanelData();
+        refreshCoins();
+      }
       const xpGain = stats.xpGain || 0;
       const oldLevel = profileState.level;
       profileState.xp += xpGain;
