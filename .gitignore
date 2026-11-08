@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+server/node_modules/
+
+# logs & temp
+*.log
+*.tmp
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# editor
+.vscode/
+.idea/
+
+# unused heavy assets (not referenced by the game)
+bmw-m4-liberty.3840x2160.mp4
+Ultimate Modular Men Pack-glb.zip
+Double Barrel Shotgun by J-Toastie - Emvvx56omx.glb

@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>StrikeX - 20 Player Battle Royale</title>
+<link rel="stylesheet" href="./styles.css?v=11" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<!-- ============================ HUD ============================ -->
+<div id="hud">
+
+  <div class="mm-wrap">
+    <canvas id="minimap"></canvas>
+  </div>
+
+  <div id="feed"></div>
+  <div id="toast" class="toast"></div>
+
+  <div class="safe-banner">
+    <i class="warn"></i>
+    <span id="zoneStatus">SAFE ZONE CLOSES IN</span>
+    <b id="zoneTime">00:30</b>
+  </div>
+
+  <div class="top-right">
+    <div class="stat-row">
+      <div class="stat-block alive"><b id="aliveNum">20</b><small>ALIVE</small></div>
+      <div class="stat-block kill"><b id="killNum">0</b><small>KILL</small></div>
+      <div class="stat-block dark"><b id="levelVal">1</b><small>LVL</small></div>
+      <div class="stat-block dark"><b id="timerVal">00:00</b><small>TIME</small></div>
+    </div>
+    <div class="wpn-card">
+      <div class="wpn-name" id="weaponName">PISTOL</div>
+      <div class="ammo-big"><b id="ammoMag">14</b><i>/</i><span id="ammoRes">∞</span></div>
+      <div id="slotList" class="slot-list"></div>
+      <div id="reloadWrap" class="reload-wrap"><div id="reloadBar" class="reload-fill"></div><span>RELOADING</span></div>
+    </div>
+  </div>
+
+  <div class="hp-wrap">
+    <span class="hp-tag">HP <b id="hpVal">100</b></span>
+    <div class="hp-track">
+      <div class="fill shield" id="shFill"></div>
+      <div class="fill health" id="hpFill"></div>
+    </div>
+    <div class="ep-track"><div class="fill ep" id="epFill"></div><span class="ep-label">EP</span></div>
+  </div>
+
+  <div id="crosshair">
+    <span class="t"></span><span class="b"></span><span class="l"></span><span class="r"></span><span class="dot"></span>
+  </div>
+  <div id="hitmarker"></div>
+  <div id="prompt"></div>
+  <div id="scope"></div>
+
+  <div id="dmgNumbers"></div>
+  <div id="damageDirs"></div>
+
+  <div class="vignette" id="stormVignette"></div>
+  <div class="vignette hurt" id="hurtVignette"></div>
+
+  <div class="action-chips">
+    <div id="abilityChip" class="chip"><b>F</b><div class="chip-meta"><span id="abilityName">ABILITY</span><em id="abilityCd">READY</em></div></div>
+    <div id="glooChip" class="chip"><b>G</b><div class="chip-meta"><span>GLOO WALL</span><em id="glooCount">3</em></div></div>
+  </div>
+
+  <div class="touch-ui">
+    <div id="stickBase"><div id="stickKnob"></div></div>
+    <div class="touch-buttons">
+      <button class="tbtn fire" data-action="fire">FIRE</button>
+      <div class="touch-row">
+        <button class="tbtn" data-action="aim">ADS</button>
+        <button class="tbtn" data-action="reload">R</button>
+      </div>
+      <div class="touch-row">
+        <button class="tbtn" data-action="jump">JUMP</button>
+        <button class="tbtn" data-action="pickup">PICK</button>
+      </div>
+      <div class="touch-row">
+        <button class="tbtn" data-action="ability">SKILL</button>
+        <button class="tbtn" data-action="gloo">GLOO</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================== ANNOUNCE ====================== -->
+<div id="announce" class="announce hidden">
+  <b id="announceText">DOUBLE KILL</b>
+  <span id="announceSub"></span>
+</div>
+
+<!-- ========================== PAUSE =========================== -->
+<div id="pause" class="hidden">
+  <div class="pause-card">
+    <h2>PAUSED</h2>
+    <p>CLICK TO RESUME</p>
+  </div>
+</div>
+
+<!-- ========================== END ============================= -->
+<div id="endScreen" class="end-screen hidden">
+  <div class="end-card">
+    <div class="end-tag">MATCH COMPLETE</div>
+    <h1 id="endTitle" class="win">VICTORY ROYALE</h1>
+    <p id="endSub">LAST OPERATIVE STANDING</p>
+    <div id="endStats" class="end-stats"></div>
+    <div class="end-buttons">
+      <button id="menuBtn" class="btn primary">MAIN MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================== MATCHMAKING ========================= -->
+<div id="matchmaking" class="matchmaking hidden">
+  <div class="mm-card">
+    <div class="mm-title">MATCHMAKING</div>
+    <div class="mm-status" id="mmStatus">CONNECTING...</div>
+    <div class="mm-timer" id="mmTimer">30</div>
+    <div class="mm-players" id="mmPlayers"></div>
+    <button id="mmCancel" class="btn ghost">CANCEL</button>
+  </div>
+</div>
+
+<!-- ========================== MENU ============================ -->
+<div id="menu">
+  <div class="menu-scrim"></div>
+
+  <!-- ===== top bar ===== -->
+  <header class="lobby-top">
+    <div class="profile">
+      <div class="avatar" data-avatar>AE</div>
+      <div class="profile-meta">
+        <b data-username>AsmaEva4917H</b>
+        <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        <span class="rank-chip" id="rankChip">BRONZE V</span>
+      </div>
+      <div class="res"><i class="coin"></i><b>103</b><em>+</em></div>
+      <div class="res"><i class="gem"></i><b>0</b><em>+</em></div>
+      <div class="res"><i class="ticket"></i><b>0</b><em>+</em></div>
+    </div>
+    <div class="lobby-logo"><span>STRIKE<em>X</em></span><small>BATTLE ROYALE</small></div>
+    <div class="lobby-tools">
+      <button class="tool" title="Friends">&#128101;</button>
+      <button class="tool" title="Mail">&#9993;</button>
+      <button class="tool" id="settingsBtn" title="Settings">&#9881;</button>
+    </div>
+  </header>
+
+  <!-- ===== left menu ===== -->
+  <nav class="lobby-nav">
+    <button class="nav-item" id="navStore"><span class="nav-ic">&#128722;</span><span class="nav-tx">STORE</span></button>
+    <button class="nav-item" id="navLuck"><span class="nav-ic">&#127920;</span><span class="nav-tx">LUCK ROYALE</span><i class="tag">NEW</i></button>
+    <button class="nav-item" id="navCharacter"><span class="nav-ic">&#129485;</span><span class="nav-tx">CHARACTER</span><i class="tag">NEW</i></button>
+    <button class="nav-item" id="navVault"><span class="nav-ic">&#128230;</span><span class="nav-tx">VAULT</span></button>
+    <button class="nav-item" id="navPet"><span class="nav-ic">&#128062;</span><span class="nav-tx">PET</span></button>
+    <button class="nav-item" id="navCollection"><span class="nav-ic">&#128450;</span><span class="nav-tx">COLLECTION</span><i class="tag">NEW</i></button>
+    <button class="nav-item" id="navWeapons"><span class="nav-ic">&#128299;</span><span class="nav-tx">WEAPONS</span><i class="tag sale">SALE</i></button>
+  </nav>
+
+  <!-- ===== mode panel ===== -->
+  <aside class="lobby-mode">
+    <div class="mode-tabs">
+      <b class="active" id="tabClassic" role="button" tabindex="0">CLASSIC</b>
+      <b id="tabRanked" role="button" tabindex="0">RANKED</b>
+    </div>
+    <div class="mode-map"><span>&#9650; BERMUDA</span><i class="mode-dot"></i></div>
+    <button class="invite-btn"><b>+</b> INVITE</button>
+    <div class="mode-rewards">&#127873; Lots of free rewards await</div>
+  </aside>
+
+  <!-- ===== right icon rail ===== -->
+  <div class="lobby-rail">
+    <button class="rail-btn" title="Stats">&#128202;</button>
+    <button class="rail-btn" title="Events">&#128197;</button>
+    <button class="rail-btn" title="Shop">&#127978;</button>
+    <button class="rail-btn" title="Clan">&#128737;</button>
+    <button class="rail-btn" title="Rank">&#127942;</button>
+  </div>
+
+  <!-- ===== character stage ===== -->
+  <section class="lobby-stage" title="Change character">
+    <canvas id="preview"></canvas>
+    <div class="stage-card">
+      <span id="previewRole">TACTICAL</span>
+      <h2 id="previewName">SWAT</h2>
+      <i class="stage-line"></i>
+    </div>
+  </section>
+
+  <!-- ===== bottom bar ===== -->
+  <footer class="lobby-chat">
+    <span class="chat-ic">&#128172;</span>
+    <span class="chat-txt">[World] MCXD | ABLOX: Team it</span>
+    <div class="controls-note">
+      <div><b>WASD</b><span>MOVE</span></div>
+      <div><b>MOUSE</b><span>AIM</span></div>
+      <div><b>CLICK</b><span>FIRE</span></div>
+      <div><b>SHIFT</b><span>SPRINT</span></div>
+      <div><b>E</b><span>PICK UP</span></div>
+      <div><b>R</b><span>RELOAD</span></div>
+      <div><b>SPACE</b><span>JUMP</span></div>
+      <div><b>1 / 2</b><span>WEAPONS</span></div>
+    </div>
+  </footer>
+
+  <!-- ===== start ===== -->
+  <button id="playBtn" class="start-btn" disabled>
+    <span class="start-glow"></span>
+    <b>START</b>
+    <small id="startModeSub">CLASSIC &middot; BERMUDA</small>
+  </button>
+
+  <!-- ===== loading ===== -->
+  <div id="loading" class="loading">
+    <div class="load-row">
+      <span id="loadingText">LOADING OPERATIVES</span>
+      <b id="loadPct">0%</b>
+    </div>
+    <div class="load-track"><div id="loadingBar" class="load-fill"></div></div>
+  </div>
+
+  <!-- ===== character selection screen ===== -->
+  <div id="charModal" class="hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+        <div class="res"><i class="coin"></i><b>103</b></div>
+        <div class="res"><i class="gem"></i><b>0</b></div>
+      </div>
+      <div class="cs-tabs">
+        <span class="cs-vault">VAULT <i>&#8250;</i></span>
+        <h2 class="cs-title">CHARACTER</h2>
+      </div>
+      <button id="charClose" class="cs-close" aria-label="Close">&#10005;</button>
+    </header>
+
+    <div class="cs-body">
+      <aside class="cs-left">
+        <div class="cs-left-head">Choose a Character</div>
+        <div id="charGrid" class="cs-grid"></div>
+      </aside>
+
+      <section class="cs-center">
+        <div id="csPreviewMount" class="cs-preview"></div>
+        <div class="cs-stage-info">
+          <span id="charSelRole">TACTICAL</span>
+          <h2 id="charSelName">SWAT</h2>
+          <div id="charStatus" class="cs-status">IN USE</div>
+        </div>
+        <div class="cs-actions">
+          <button id="charEquip" class="equip-btn">EQUIPPED</button>
+        </div>
+      </section>
+
+      <aside class="cs-right">
+        <div class="cs-right-head">CHARACTER INFO</div>
+        <div class="cs-info">
+          <div class="cs-info-row"><span>CLASS</span><b id="charClass">TACTICAL</b></div>
+          <div class="cs-info-row"><span>STATUS</span><b id="charInfoStatus">IN USE</b></div>
+          <div class="cs-info-row"><span>AFFILIATION</span><b>StrikeX</b></div>
+          <div class="cs-info-row"><span>HOBBY</span><b>BATTLE ROYALE</b></div>
+          <div class="cs-info-row"><span>RELATIONSHIPS</span><b>PRIVATE</b></div>
+        </div>
+        <div class="cs-story">
+          <span>BIO</span>
+          <p id="charDesc">A tactical specialist trained to survive any drop zone.</p>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="cs-footer">
+      <span class="cs-foot-left">11 CHARACTERS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right" id="charFootName">SWAT</span>
+    </footer>
+  </div>
+
+  <!-- ===== weapon armory screen ===== -->
+  <div id="wpnModal" class="hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+        <div class="res"><i class="coin"></i><b>103</b></div>
+        <div class="res"><i class="gem"></i><b>0</b></div>
+      </div>
+      <div class="cs-tabs">
+        <span class="cs-vault">ARMORY <i>&#8250;</i></span>
+        <h2 class="cs-title">WEAPONS</h2>
+      </div>
+      <button id="wpnClose" class="cs-close" aria-label="Close">&#10005;</button>
+    </header>
+
+    <div class="cs-body">
+      <aside class="cs-left">
+        <div class="cs-left-head">Choose a Weapon</div>
+        <div id="wpnGrid" class="cs-grid"></div>
+      </aside>
+
+      <section class="cs-center">
+        <div id="wpnPreviewMount" class="cs-preview"></div>
+        <div class="cs-stage-info">
+          <span id="wpnSelType">ASSAULT</span>
+          <h2 id="wpnSelName">SCAR</h2>
+          <div id="wpnStatus" class="cs-status">EQUIPPED</div>
+        </div>
+        <div class="cs-actions">
+          <button id="wpnEquip" class="equip-btn">EQUIPPED</button>
+        </div>
+      </section>
+
+      <aside class="cs-right">
+        <div class="cs-right-head">WEAPON INFO</div>
+        <div class="cs-info">
+          <div class="cs-info-row"><span>CLASS</span><b id="wpnClass">ASSAULT</b></div>
+          <div class="cs-info-row"><span>FIRE MODE</span><b id="wpnType">FULL AUTO</b></div>
+          <div class="cs-info-row"><span>DAMAGE</span><b id="wpnDmg">23</b></div>
+          <div class="cs-info-row"><span>FIRE RATE</span><b id="wpnRpm">600 RPM</b></div>
+          <div class="cs-info-row"><span>MAGAZINE</span><b id="wpnMag">30</b></div>
+          <div class="cs-info-row"><span>RANGE</span><b id="wpnRange">190m</b></div>
+          <div class="cs-info-row"><span>RELOAD</span><b id="wpnReload">1.75s</b></div>
+          <div class="cs-info-row"><span>LENGTH</span><b id="wpnLen">40cm</b></div>
+        </div>
+        <div class="wpn-pow">
+          <div class="wpn-pow-top"><span>POWER</span><b id="wpnDps">230 DPS</b></div>
+          <div class="wpn-pow-track"><div id="wpnPowFill" class="wpn-pow-fill"></div></div>
+        </div>
+        <div class="cs-story">
+          <span>ABILITY</span>
+          <p id="wpnDesc">Balanced assault platform.</p>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="cs-footer">
+      <span class="cs-foot-left" id="wpnCount">21 WEAPONS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right" id="wpnFootName">SCAR</span>
+    </footer>
+  </div>
+
+  <!-- ===== STATS MODAL ===== -->
+  <div id="statsModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">PROFILE <i>&#8250;</i></span><h2 class="cs-title">STATS</h2></div>
+      <button id="statsClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div class="panel-grid">
+        <div class="panel-card"><span class="panel-label">MATCHES</span><b id="stMatches">0</b></div>
+        <div class="panel-card"><span class="panel-label">WINS</span><b id="stWins">0</b></div>
+        <div class="panel-card"><span class="panel-label">KILLS</span><b id="stKills">0</b></div>
+        <div class="panel-card"><span class="panel-label">K/D RATIO</span><b id="stKD">0.00</b></div>
+        <div class="panel-card"><span class="panel-label">DAMAGE</span><b id="stDamage">0</b></div>
+        <div class="panel-card"><span class="panel-label">HEADSHOTS</span><b id="stHS">0</b></div>
+        <div class="panel-card"><span class="panel-label">SURVIVAL TIME</span><b id="stSurvive">0h 0m</b></div>
+        <div class="panel-card"><span class="panel-label">BEST PLACEMENT</span><b id="stBest">#-</b></div>
+        <div class="panel-card"><span class="panel-label">LEVEL</span><b id="stLevel">1</b></div>
+        <div class="panel-card"><span class="panel-label">RANK</span><b id="stRank">BRONZE V</b></div>
+      </div>
+      <div class="panel-note">Stats are synced to Firebase Realtime Database.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left">PLAYER STATS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right" id="stName">PLAYER</span>
+    </footer>
+  </div>
+
+  <!-- ===== MAIL MODAL ===== -->
+  <div id="mailModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">INBOX <i>&#8250;</i></span><h2 class="cs-title">MAIL</h2></div>
+      <button id="mailClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div id="mailList" class="mail-list"></div>
+      <div class="panel-note">Claim your rewards before they expire.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left" id="mailCount">0 MAILS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <button id="mailClaimAll" class="btn primary" style="min-width:120px;padding:8px 16px;">CLAIM ALL</button>
+    </footer>
+  </div>
+
+  <!-- ===== FRIENDS MODAL ===== -->
+  <div id="friendsModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">SOCIAL <i>&#8250;</i></span><h2 class="cs-title">FRIENDS</h2></div>
+      <button id="friendsClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div class="friends-add">
+        <input id="friendInput" class="login-input" placeholder="ENTER USERNAME" maxlength="16" />
+        <button id="friendAddBtn" class="btn primary" style="min-width:90px;padding:10px 16px;">ADD</button>
+      </div>
+      <div id="friendsList" class="friends-list"></div>
+      <div class="panel-note">Add friends by username. Friends are synced to Firebase.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left" id="friendsCount">0 FRIENDS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right">ONLINE</span>
+    </footer>
+  </div>
+
+  <!-- ===== SHOP MODAL ===== -->
+  <div id="shopModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+        <div class="res"><i class="coin"></i><b id="shopCoins">103</b></div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">ARMORY <i>&#8250;</i></span><h2 class="cs-title">SHOP</h2></div>
+      <button id="shopClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div id="shopGrid" class="shop-grid"></div>
+      <div class="panel-note">Buy cosmetics with coins. Synced to Firebase.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left">COSMETIC SHOP</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right">COINS: <b id="shopCoinsFoot">103</b></span>
+    </footer>
+  </div>
+
+  <!-- ===== EVENTS MODAL ===== -->
+  <div id="eventsModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">EVENTS <i>&#8250;</i></span><h2 class="cs-title">EVENTS</h2></div>
+      <button id="eventsClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div id="eventsList" class="events-list"></div>
+      <div class="panel-note">Limited-time events with rewards.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left">ACTIVE EVENTS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right" id="eventsCount">0 EVENTS</span>
+    </footer>
+  </div>
+
+  <!-- ===== CLAN MODAL ===== -->
+  <div id="clanModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">CLAN <i>&#8250;</i></span><h2 class="cs-title">CLAN</h2></div>
+      <button id="clanClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div id="clanBody" class="clan-body"></div>
+      <div class="panel-note">Join or create a clan to play together.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left" id="clanName">NO CLAN</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right" id="clanMembers">0 MEMBERS</span>
+    </footer>
+  </div>
+
+  <!-- ===== PET MODAL ===== -->
+  <div id="petModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">PET <i>&#8250;</i></span><h2 class="cs-title">PET</h2></div>
+      <button id="petClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div id="petGrid" class="pet-grid"></div>
+      <div class="panel-note">Pets give passive bonuses in battle.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left" id="petCount">0 PETS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right" id="petName">NONE</span>
+    </footer>
+  </div>
+
+  <!-- ===== VAULT MODAL ===== -->
+  <div id="vaultModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">VAULT <i>&#8250;</i></span><h2 class="cs-title">VAULT</h2></div>
+      <button id="vaultClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div id="vaultGrid" class="vault-grid"></div>
+      <div class="panel-note">Your owned cosmetics and items.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left" id="vaultCount">0 ITEMS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right">VAULT</span>
+    </footer>
+  </div>
+
+  <!-- ===== COLLECTION MODAL ===== -->
+  <div id="collectionModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">COLLECTION <i>&#8250;</i></span><h2 class="cs-title">COLLECTION</h2></div>
+      <button id="collectionClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div id="collectionList" class="collection-list"></div>
+      <div class="panel-note">Achievements and collections.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left" id="collectionCount">0 ACHIEVEMENTS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right">COLLECTION</span>
+    </footer>
+  </div>
+
+  <!-- ===== RANK LEADERBOARD MODAL ===== -->
+  <div id="rankModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">LEADERBOARD <i>&#8250;</i></span><h2 class="cs-title">RANK</h2></div>
+      <button id="rankClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div id="rankList" class="rank-list"></div>
+      <div class="panel-note">Top players by rank points.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left" id="rankCount">0 PLAYERS</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right" id="rankPlayer">YOUR RANK: BRONZE V</span>
+    </footer>
+  </div>
+
+  <!-- ===== LUCK ROYALE MODAL ===== -->
+  <div id="luckModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+        <div class="res"><i class="coin"></i><b id="luckCoins">103</b></div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">LUCK ROYALE <i>&#8250;</i></span><h2 class="cs-title">LUCK ROYALE</h2></div>
+      <button id="luckClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div class="luck-box">
+        <div class="luck-prize" id="luckPrize">SPIN TO WIN!</div>
+        <button id="luckSpin" class="btn primary" style="min-width:140px;padding:14px 28px;">SPIN (100 COINS)</button>
+      </div>
+      <div class="panel-note">Spin for a chance at rare cosmetics.</div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left">LUCK ROYALE</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right">COINS: <b id="luckCoinsFoot">103</b></span>
+    </footer>
+  </div>
+
+  <!-- ===== INVITE MODAL ===== -->
+  <div id="inviteModal" class="panel-modal hidden">
+    <header class="cs-top">
+      <div class="profile">
+        <div class="avatar" data-avatar>AE</div>
+        <div class="profile-meta">
+          <b data-username>AsmaEva4917H</b>
+          <span data-profile-level>LV. 1 &middot; ROOKIE</span>
+        </div>
+      </div>
+      <div class="cs-tabs"><span class="cs-vault">SQUAD <i>&#8250;</i></span><h2 class="cs-title">INVITE</h2></div>
+      <button id="inviteClose" class="cs-close">&#10005;</button>
+    </header>
+    <div class="panel-body">
+      <div class="panel-note">Solo mode active. Squad invites coming soon.</div>
+      <div id="inviteList" class="friends-list"></div>
+    </div>
+    <footer class="cs-footer">
+      <span class="cs-foot-left">SQUAD INVITE</span>
+      <div class="cs-foot-bar"><i></i></div>
+      <span class="cs-foot-right">SOLO MODE</span>
+    </footer>
+  </div>
+
+  <!-- ===== settings screen ===== -->
+  <div id="settingsScreen" class="hidden">
+    <header class="set-top">
+      <div class="set-brand">
+        <span>StrikeX</span>
+        <h2>SETTINGS</h2>
+      </div>
+      <div class="set-top-meta">LOCAL PROFILE &middot; ASIA</div>
+      <button id="setClose" class="set-close" aria-label="Close settings">&#10005;</button>
+    </header>
+
+    <div class="set-body">
+      <nav class="set-tabs" aria-label="Settings sections">
+        <button class="set-tab active" data-tab="sensitivity"><span>01</span>SENSITIVITY</button>
+        <button class="set-tab" data-tab="controls"><span>02</span>CONTROLS</button>
+        <button class="set-tab" data-tab="pickup"><span>03</span>AUTO PICKUP</button>
+        <button class="set-tab" data-tab="display"><span>04</span>DISPLAY</button>
+        <button class="set-tab" data-tab="audio"><span>05</span>SOUND</button>
+      </nav>
+
+      <section class="set-content">
+        <!-- sensitivity -->
+        <div class="set-panel active" data-panel="sensitivity">
+          <div class="set-panel-head">
+            <span class="set-kicker">AIM</span>
+            <h3>SENSITIVITY</h3>
+            <p>Fine-tune how fast your aim responds in every situation.</p>
+          </div>
+          <div class="set-rows">
+            <div class="set-row">
+              <div class="set-row-top"><span>GENERAL</span><b class="set-num">50</b></div>
+              <input class="set-range" type="range" min="0" max="100" step="1" value="50" data-set="sens.general" aria-label="General sensitivity" />
+              <p class="set-hint">Hip fire and camera movement.</p>
+            </div>
+            <div class="set-row">
+              <div class="set-row-top"><span>RED DOT</span><b class="set-num">80</b></div>
+              <input class="set-range" type="range" min="0" max="100" step="1" value="80" data-set="sens.redDot" aria-label="Red dot sensitivity" />
+              <p class="set-hint">Red dot and holographic sights.</p>
+            </div>
+            <div class="set-row">
+              <div class="set-row-top"><span>2X SCOPE</span><b class="set-num">65</b></div>
+              <input class="set-range" type="range" min="0" max="100" step="1" value="65" data-set="sens.scope2x" aria-label="2x scope sensitivity" />
+              <p class="set-hint">2x scoped weapons.</p>
+            </div>
+            <div class="set-row">
+              <div class="set-row-top"><span>4X SCOPE</span><b class="set-num">55</b></div>
+              <input class="set-range" type="range" min="0" max="100" step="1" value="55" data-set="sens.scope4x" aria-label="4x scope sensitivity" />
+              <p class="set-hint">4x scoped weapons.</p>
+            </div>
+            <div class="set-row">
+              <div class="set-row-top"><span>SNIPER SCOPE</span><b class="set-num">45</b></div>
+              <input class="set-range" type="range" min="0" max="100" step="1" value="45" data-set="sens.sniper" aria-label="Sniper scope sensitivity" />
+              <p class="set-hint">High-power sniper scopes.</p>
+            </div>
+            <div class="set-row">
+              <div class="set-row-top"><span>FREE LOOK</span><b class="set-num">50</b></div>
+              <input class="set-range" type="range" min="0" max="100" step="1" value="50" data-set="sens.freeLook" aria-label="Free look sensitivity" />
+              <p class="set-hint">Camera look while free looking.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- controls -->
+        <div class="set-panel" data-panel="controls">
+          <div class="set-panel-head">
+            <span class="set-kicker">INPUT</span>
+            <h3>CONTROLS</h3>
+            <p>Set up your controls and in-game feedback.</p>
+          </div>
+          <div class="set-rows two-col">
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>AIM PRECISION</span></div>
+              <select class="set-select" data-set="controls.aimPrecision" aria-label="Aim precision">
+                <option value="Precise on Scope">Precise on Scope</option>
+                <option value="Full Scroll">Full Scroll</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>LEFT FIRE BUTTON</span></div>
+              <select class="set-select" data-set="controls.leftFire" aria-label="Left fire button">
+                <option value="Always">Always</option>
+                <option value="Scope Only">Scope Only</option>
+                <option value="Never">Never</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>QUICK WEAPON SWITCH</span></div>
+              <select class="set-select" data-set="controls.quickWeapon" aria-label="Quick weapon switch">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>QUICK RELOAD</span></div>
+              <select class="set-select" data-set="controls.quickReload" aria-label="Quick reload">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>QUICK SWAP</span></div>
+              <select class="set-select" data-set="controls.quickSwap" aria-label="Quick swap">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>VEHICLE CONTROLS</span></div>
+              <select class="set-select" data-set="controls.vehicleControls" aria-label="Vehicle controls">
+                <option value="Default Position">Default Position</option>
+                <option value="Custom Position">Custom Position</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>AUTO PARACHUTE</span></div>
+              <select class="set-select" data-set="controls.autoParachute" aria-label="Auto parachute">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>IN-GAME TIPS</span></div>
+              <select class="set-select" data-set="controls.tips" aria-label="In-game tips">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>DAMAGE INDICATOR</span></div>
+              <select class="set-select" data-set="controls.damageIndicator" aria-label="Damage indicator">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>AUTO SWITCH GUN</span></div>
+              <select class="set-select" data-set="controls.autoSwitch" aria-label="Auto switch gun">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- auto pickup -->
+        <div class="set-panel" data-panel="pickup">
+          <div class="set-panel-head">
+            <span class="set-kicker">LOOT</span>
+            <h3>AUTO PICKUP</h3>
+            <p>Choose what your operative grabs automatically.</p>
+          </div>
+          <div class="set-rows two-col">
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>AUTO PICKUP</span></div>
+              <select class="set-select" data-set="pickup.autoPickup" aria-label="Auto pickup">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>AMMUNITION</span></div>
+              <select class="set-select" data-set="pickup.ammo" aria-label="Auto pickup ammunition">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>MEDICALS</span></div>
+              <select class="set-select" data-set="pickup.meds" aria-label="Auto pickup medicals">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>ARMOR</span></div>
+              <select class="set-select" data-set="pickup.armor" aria-label="Auto pickup armor">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>ATTACHMENTS</span></div>
+              <select class="set-select" data-set="pickup.attachments" aria-label="Auto pickup attachments">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+            <div class="set-row set-row-inline">
+              <div class="set-row-top"><span>AUTO OPEN DOORS</span></div>
+              <select class="set-select" data-set="pickup.doors" aria-label="Auto open doors">
+                <option value="On">On</option>
+                <option value="Off">Off</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- display -->
+        <div class="set-panel" data-panel="display">
+          <div class="set-panel-head">
+            <span class="set-kicker">VIDEO</span>
+            <h3>DISPLAY</h3>
+            <p>Choose the graphics quality that fits your device.</p>
+          </div>
+          <div class="quality-grid">
+            <button class="quality-card" type="button" data-quality="smooth" aria-pressed="false">
+              <span class="quality-art q-smooth"></span>
+              <b>SMOOTH</b>
+              <small>BEST PERFORMANCE</small>
+            </button>
+            <button class="quality-card" type="button" data-quality="standard" aria-pressed="false">
+              <span class="quality-art q-standard"></span>
+              <b>STANDARD</b>
+              <small>BALANCED</small>
+            </button>
+            <button class="quality-card selected" type="button" data-quality="hd" aria-pressed="true">
+              <span class="quality-art q-hd"></span>
+              <b>HD</b>
+              <small>RECOMMENDED</small>
+            </button>
+            <button class="quality-card" type="button" data-quality="ultra" aria-pressed="false">
+              <span class="quality-art q-ultra"></span>
+              <b>ULTRA</b>
+              <small>BEST VISUALS</small>
+            </button>
+          </div>
+          <p class="set-note">Quality changes apply immediately. Higher settings need a stronger GPU.</p>
+        </div>
+
+        <!-- sound -->
+        <div class="set-panel" data-panel="audio">
+          <div class="set-panel-head">
+            <span class="set-kicker">AUDIO</span>
+            <h3>SOUND</h3>
+            <p>Balance music, sound effects and voice.</p>
+          </div>
+          <div class="set-rows">
+            <div class="set-row">
+              <div class="set-row-top"><span>MUSIC</span><b class="set-num">50</b></div>
+              <input class="set-range" type="range" min="0" max="100" step="1" value="50" data-set="audio.music" aria-label="Music volume" />
+              <p class="set-hint">Menu and lobby music.</p>
+            </div>
+            <div class="set-row">
+              <div class="set-row-top"><span>SOUND EFFECTS</span><b class="set-num">60</b></div>
+              <input class="set-range" type="range" min="0" max="100" step="1" value="60" data-set="audio.sfx" aria-label="Sound effects volume" />
+              <p class="set-hint">Weapons, footsteps and interface sounds.</p>
+            </div>
+            <div class="set-row">
+              <div class="set-row-top"><span>VOICE</span><b class="set-num">50</b></div>
+              <input class="set-range" type="range" min="0" max="100" step="1" value="50" data-set="audio.voice" aria-label="Voice volume" />
+              <p class="set-hint">Character voice lines.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="set-foot">
+      <button id="setExit" class="set-exit">EXIT TO LOBBY</button>
+      <div class="set-foot-meta">CHANGES SAVED AUTOMATICALLY</div>
+      <button id="setReset" class="set-reset">RESET</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ========================== LOGIN =========================== -->
+<div id="loginScreen">
+  <div class="login-glow"></div>
+  <div class="login-scan"></div>
+  <div class="login-card">
+    <div class="login-kicker"><i></i> STRIKEX NETWORK &middot; ASIA</div>
+    <div class="login-logo"><span>STRIKE</span><em>X</em></div>
+    <h2>OPERATIVE LOGIN</h2>
+    <p class="login-copy">Enter your username to sync your StrikeX profile with Firebase Realtime Database.</p>
+    <label class="login-label" for="loginName">USERNAME</label>
+    <input id="loginName" class="login-input" type="text" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="NIGHTFALL" aria-label="Username" />
+    <div id="loginMsg" class="login-msg">ENTER A USERNAME TO CONNECT</div>
+    <button id="loginBtn" class="login-btn">
+      <span class="login-btn-shine"></span>
+      <b>ENTER THE DROP ZONE</b>
+      <small>FIREBASE &middot; REALTIME DATABASE</small>
+    </button>
+    <div class="login-foot">
+      <span>3-16 CHARACTERS</span>
+      <span>LETTERS &middot; NUMBERS &middot; _ &middot; .</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========================== TITLE =========================== -->
+<div id="titleScreen">
+  <div class="title-glow"></div>
+  <div class="title-scan"></div>
+
+  <div class="title-top">
+    <span>SEASON 01 &middot; ASIA</span>
+    <span data-welcome>WELCOME, OPERATIVE</span>
+    <span>20 PLAYER SURVIVAL</span>
+  </div>
+
+  <div class="title-brand">
+    <span class="title-eyebrow">WELCOME TO</span>
+    <h1 class="title-logo"><span>STRIKE</span><em>X</em></h1>
+    <p class="title-sub">DROP IN &middot; GEAR UP &middot; OUTLAST THE STORM</p>
+  </div>
+
+  <div id="titleMount" class="title-stage"></div>
+
+  <div class="title-bottom">
+    <button id="titleStart" class="title-start" disabled>
+      <span class="title-start-shine"></span>
+      <b id="titleStartLabel">LOADING...</b>
+      <small id="titleStartSub">PLEASE WAIT</small>
+    </button>
+    <div class="title-loading">
+      <div class="title-load-row">
+        <span id="titleLoadingText">LOADING OPERATIVES</span>
+        <b id="titleLoadPct">0%</b>
+      </div>
+      <div class="title-load-track"><div id="titleLoadingBar"></div></div>
+    </div>
+  </div>
+
+  <div class="title-foot">
+    <span>STRIKE X &middot; EARLY ACCESS</span>
+    <span>v1.0.0 &middot; SERVER ASIA</span>
+  </div>
+</div>
+
+<script src="./vendor/colyseus.js"></script>
+<script type="module" src="./js/main.js?v=13"></script>
+</body>
+</html>

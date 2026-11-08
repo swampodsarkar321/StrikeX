@@ -1,0 +1,288 @@
+// ------------------------------------------------------------------
+//  StrikeX - Firebase Realtime Database profile / username login
+// ------------------------------------------------------------------
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyD1o0lIozPuVztWVtLOlJtwCjxe4GtdBT0',
+  authDomain: 'strikex-29776.firebaseapp.com',
+  databaseURL: 'https://strikex-29776-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: 'strikex-29776',
+  storageBucket: 'strikex-29776.firebasestorage.app',
+  messagingSenderId: '32371795404',
+  appId: '1:32371795404:web:e7c9b671eb1f0b589c2969',
+  measurementId: 'G-WYEV9WY647',
+};
+
+const DB_ROOT = 'strikex';
+const PROFILE_KEY = 'strikex-profile-v1';
+const UID_KEY = 'strikex-device-uid';
+
+let firebaseBundle = null;
+let heartbeatTimer = null;
+let unloadHooked = false;
+
+export function getSavedProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.username !== 'string') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveProfile(profile) {
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch {}
+}
+
+function deviceUid() {
+  let uid = '';
+  try { uid = localStorage.getItem(UID_KEY) || ''; } catch {}
+  if (!uid) {
+    uid = (window.crypto && typeof window.crypto.randomUUID === 'function')
+      ? window.crypto.randomUUID()
+      : 'u_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    try { localStorage.setItem(UID_KEY, uid); } catch {}
+  }
+  return uid;
+}
+
+async function ensureFirebase() {
+  if (firebaseBundle) return firebaseBundle;
+
+  const [appMod, dbMod] = await Promise.all([
+    import('../vendor/firebase/firebase-app.js'),
+    import('../vendor/firebase/firebase-database.js'),
+  ]);
+
+  const app = appMod.getApps().length ? appMod.getApp() : appMod.initializeApp(FIREBASE_CONFIG);
+  const db = dbMod.getDatabase(app);
+
+  firebaseBundle = { app, db, mod: dbMod };
+  return firebaseBundle;
+}
+
+function startHeartbeat(bundle, uid) {
+  const { db, mod } = bundle;
+  clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
+    try {
+      mod.update(mod.ref(db, `${DB_ROOT}/players/${uid}`), {
+        online: true,
+        lastSeen: Date.now(),
+      }).catch(() => {});
+    } catch {}
+  }, 45000);
+
+  if (!unloadHooked) {
+    unloadHooked = true;
+    const goOffline = () => {
+      try {
+        mod.update(mod.ref(db, `${DB_ROOT}/players/${uid}`), {
+          online: false,
+          lastSeen: Date.now(),
+        });
+      } catch {}
+    };
+    window.addEventListener('pagehide', goOffline);
+    window.addEventListener('beforeunload', goOffline);
+  }
+}
+
+function localProfile(username, uid) {
+  const profile = {
+    uid,
+    username,
+    cloud: false,
+    savedAt: Date.now(),
+  };
+  saveProfile(profile);
+  return profile;
+}
+
+export async function loadPlayerData() {
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch (err) {
+    console.warn('[StrikeX] Firebase unavailable for data load.', err);
+    return null;
+  }
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return null;
+  const { db, mod } = bundle;
+  try {
+    const snapPromise = mod.get(mod.ref(db, `${DB_ROOT}/players/${profile.uid}`));
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+    const snap = await Promise.race([snapPromise, timeoutPromise]);
+    if (!snap || !snap.exists()) return null;
+    const val = snap.val() || {};
+    return { rank: val.rank || null, armory: val.armory || null, level: val.level || 1, xp: val.xp || 0 };
+  } catch (err) {
+    console.warn('[StrikeX] Failed to load player data.', err);
+    return null;
+  }
+}
+
+export async function loadLeaderboard(limit = 20) {
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return []; }
+  const { db, mod } = bundle;
+  try {
+    const snapPromise = mod.get(mod.ref(db, `${DB_ROOT}/players`));
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+    const snap = await Promise.race([snapPromise, timeoutPromise]);
+    if (!snap || !snap.exists()) return [];
+    const players = [];
+    snap.forEach((child) => {
+      const v = child.val();
+      if (v && v.name) {
+        players.push({ name: v.name, rp: (v.rank && v.rank.rp) || 0, level: v.level || 1 });
+      }
+    });
+    players.sort((a, b) => b.rp - a.rp);
+    return players.slice(0, limit);
+  } catch (err) {
+    console.warn('[StrikeX] leaderboard load failed', err);
+    return [];
+  }
+}
+export async function lookupPlayerByUsername(rawName) {
+  const name = String(rawName || '').trim().replace(/\s+/g, '');
+  if (!/^[A-Za-z0-9_.]{3,16}$/.test(name)) return null;
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return null; }
+  const { db, mod } = bundle;
+  try {
+    const nameSnap = await mod.get(mod.ref(db, `${DB_ROOT}/usernames/${name.toLowerCase()}`));
+    if (!nameSnap.exists()) return null;
+    const claim = nameSnap.val();
+    const playerSnap = await mod.get(mod.ref(db, `${DB_ROOT}/players/${claim.uid}`));
+    if (!playerSnap.exists()) return { username: name, uid: claim.uid, online: false };
+    const p = playerSnap.val();
+    return { username: p.name || name, uid: claim.uid, online: !!p.online, lastSeen: p.lastSeen || 0, level: p.level || 1 };
+  } catch (err) {
+    console.warn('[StrikeX] lookup failed', err);
+    return null;
+  }
+}
+export async function savePlayerData(patch) {
+  if (!patch || typeof patch !== 'object') return false;
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return false;
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch (err) {
+    console.warn('[StrikeX] Firebase unavailable for data save.', err);
+    return false;
+  }
+  const { db, mod } = bundle;
+  try {
+    await mod.update(mod.ref(db, `${DB_ROOT}/players/${profile.uid}`), patch);
+    return true;
+  } catch (err) {
+    console.warn('[StrikeX] Failed to save player data.', err);
+    return false;
+  }
+}
+
+/**
+ * Log in with a username against Firebase Realtime Database.
+ * If the cloud cannot be reached the game still works with a local profile.
+ */
+export async function loginWithUsername(rawName) {
+  const username = String(rawName || '').trim().replace(/\s+/g, '');
+  if (!/^[A-Za-z0-9_.]{3,16}$/.test(username)) {
+    const err = new Error('INVALID_USERNAME');
+    err.code = 'INVALID_USERNAME';
+    throw err;
+  }
+
+  const uid = deviceUid();
+  const nameKey = username.toLowerCase();
+
+  let bundle;
+  try {
+    bundle = await ensureFirebase();
+  } catch (err) {
+    console.warn('[StrikeX] Firebase SDK unavailable, using local profile.', err);
+    return localProfile(username, uid);
+  }
+
+  const { db, mod } = bundle;
+
+  try {
+    const nameRef = mod.ref(db, `${DB_ROOT}/usernames/${nameKey}`);
+    const nameSnap = await mod.get(nameRef);
+
+    if (nameSnap.exists()) {
+      const claim = nameSnap.val();
+      if (!claim || claim.uid !== uid) {
+        const err = new Error('USERNAME_TAKEN');
+        err.code = 'USERNAME_TAKEN';
+        throw err;
+      }
+    } else {
+      await mod.set(nameRef, {
+        uid,
+        name: username,
+        createdAt: Date.now(),
+      });
+    }
+
+    const playerRef = mod.ref(db, `${DB_ROOT}/players/${uid}`);
+    const playerSnap = await mod.get(playerRef);
+    const now = Date.now();
+    const playerData = {
+      name: username,
+      nameLower: nameKey,
+      online: true,
+      lastSeen: now,
+    };
+    if (!playerSnap.exists()) playerData.createdAt = now;
+
+    await mod.update(playerRef, playerData);
+
+    try {
+      await mod.onDisconnect(mod.ref(db, `${DB_ROOT}/players/${uid}/online`)).set(false);
+    } catch (err) {
+      console.warn('[StrikeX] onDisconnect unavailable.', err);
+    }
+
+    const profile = {
+      uid,
+      username,
+      cloud: true,
+      savedAt: now,
+    };
+    saveProfile(profile);
+    startHeartbeat(bundle, uid);
+    return profile;
+  } catch (err) {
+    if (err && err.code === 'USERNAME_TAKEN') throw err;
+
+    // Network/rules/SDK error: keep the game usable with the same username.
+    console.warn('[StrikeX] Firebase login failed, using local profile.', err);
+    return localProfile(username, uid);
+  }
+}
+
+export function signOutProfile() {
+  const profile = getSavedProfile();
+  if (profile) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+      if (raw) {
+        const bundle = firebaseBundle;
+        if (bundle) {
+          const { db, mod } = bundle;
+          mod.update(mod.ref(db, `${DB_ROOT}/players/${profile.uid}`), {
+            online: false,
+            lastSeen: Date.now(),
+          }).catch(() => {});
+        }
+      }
+    } catch {}
+  }
+  clearInterval(heartbeatTimer);
+  heartbeatTimer = null;
+  try { localStorage.removeItem(PROFILE_KEY); } catch {}
+}
