@@ -51,6 +51,9 @@ let aiming = false;
 let pointerLocked = false;
 let paused = false;
 
+// auto-return-to-lobby timer after a match ends
+let endReturnTimer = null;
+
 // --------------------------------------------------------- ranked mode
 const RANK_KEY = 'strikey-rank-v1';
 const TIERS = [
@@ -156,8 +159,12 @@ async function syncProfileFromCloud() {
   }
 }
 
-// multiplayer
-let colyseusClient = null;
+// Colyseus multiplayer server URL.
+// Local dev: ws://localhost:2569  (run: node server/index.js)
+// Production: set to your Render/Railway/Fly.io URL, e.g. wss://strikex-server.onrender.com
+const SERVER_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'ws://localhost:2569'
+  : 'wss://strikex-server.onrender.com';   // <-- update after deploying the server
 let gameRoom = null;
 let remoteFighters = new Map();
 let remoteSyncEnabled = false;
@@ -1765,6 +1772,7 @@ playBtn.addEventListener('click', () => {
 
 // ------------------------------------------------- end-of-match cleanup
 function cleanupMatch() {
+  if (endReturnTimer) { clearInterval(endReturnTimer); endReturnTimer = null; }
   if (document.pointerLockElement) document.exitPointerLock();
   paused = false;
   aiming = false;
@@ -1819,7 +1827,7 @@ async function startMatchmaking() {
   $('#mmPlayers').innerHTML = '';
 
   try {
-    if (!colyseusClient) colyseusClient = new window.Colyseus.Client('ws://localhost:2569');
+    if (!colyseusClient) colyseusClient = new window.Colyseus.Client(SERVER_URL);
     const profile = getProfile();
     gameRoom = await colyseusClient.joinOrCreate('game', { name: profile.username || 'PLAYER' });
   } catch (err) {
@@ -2017,6 +2025,21 @@ function startMatch() {
         setTimeout(() => hud.announce('LEVEL UP!', `LV. ${profileState.level}`), 1600);
       }
       hud.showEnd(win, stats);
+
+      // auto-return to lobby countdown (so the player is never stuck in the match)
+      let secs = 6;
+      const cdEl = document.getElementById('endCountdown');
+      if (cdEl) cdEl.textContent = `Returning to lobby in ${secs}…`;
+      if (endReturnTimer) clearInterval(endReturnTimer);
+      endReturnTimer = setInterval(() => {
+        secs -= 1;
+        if (cdEl) cdEl.textContent = secs > 0 ? `Returning to lobby in ${secs}…` : 'Returning to lobby…';
+        if (secs <= 0) {
+          clearInterval(endReturnTimer);
+          endReturnTimer = null;
+          returnToMenu();
+        }
+      }, 1000);
     },
   });
   mode = 'playing';
@@ -2130,6 +2153,8 @@ function animate(now) {
     }
   } else if (mode === 'over' && match) {
     effects.update(dt, camera);
+    renderer.setClearColor(0x05080c, 1);
+    renderer.clear();
   }
 
   renderer.render(scene, camera);
