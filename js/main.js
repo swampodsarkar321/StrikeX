@@ -161,11 +161,12 @@ async function syncProfileFromCloud() {
 
 // Colyseus multiplayer server URL.
 // Local dev: ws://localhost:2569  (run: node server/index.js)
-// Production: set to your Render/Railway/Fly.io URL, e.g. wss://strikex-server.onrender.com
+// Production: Render server URL
 const SERVER_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? 'ws://localhost:2569'
-  : 'wss://strikex-server.onrender.com';   // <-- update after deploying the server
+  : 'wss://server-dhrz.onrender.com';
 let gameRoom = null;
+let colyseusClient = null;
 let remoteFighters = new Map();
 let remoteSyncEnabled = false;
 let mmActive = false;
@@ -820,7 +821,6 @@ const PANELS = [
   { id: 'shop', nav: null },
   { id: 'events', nav: null },
   { id: 'clan', nav: null },
-  { id: 'pet', nav: null },
   { id: 'vault', nav: null },
   { id: 'collection', nav: null },
   { id: 'rank', nav: null },
@@ -846,7 +846,7 @@ function closePanel(id) {
 }
 
 // wire close buttons
-['stats','mail','friends','shop','events','clan','pet','vault','collection','rank','luck','invite'].forEach((id) => {
+['stats','mail','friends','shop','events','clan','vault','collection','rank','luck','invite'].forEach((id) => {
   const btn = document.getElementById(id + 'Close');
   if (btn) btn.addEventListener('click', () => closePanel(id));
 });
@@ -855,12 +855,10 @@ function closePanel(id) {
 const navStore = $('#navStore');
 const navLuck = $('#navLuck');
 const navVault = $('#navVault');
-const navPet = $('#navPet');
 const navCollection = $('#navCollection');
 if (navStore) navStore.addEventListener('click', () => openPanel('shop'));
 if (navLuck) navLuck.addEventListener('click', () => openPanel('luck'));
 if (navVault) navVault.addEventListener('click', () => openPanel('vault'));
-if (navPet) navPet.addEventListener('click', () => openPanel('pet'));
 if (navCollection) navCollection.addEventListener('click', () => openPanel('collection'));
 
 // top bar tools: stats, events, shop, clan, rank
@@ -907,7 +905,6 @@ let panelData = {
   ],
   friends: [],
   clan: null,
-  pet: null,
   vault: [],
   collection: [
     { name: 'FIRST BLOOD', desc: 'Get your first elimination.', done: false },
@@ -916,6 +913,13 @@ let panelData = {
     { name: 'WINNER', desc: 'Win a battle royale match.', done: false },
     { name: 'VETERAN', desc: 'Play 10 matches.', done: false },
     { name: 'COLLECTOR', desc: 'Own 5 weapons in your vault.', done: false },
+  ],
+  pets: [
+    { id: 'none', name: 'NONE', ability: 'No bonus.' },
+    { id: 'falcon', name: 'FALCON', ability: '+5% movement speed.' },
+    { id: 'panther', name: 'PANTHER', ability: '+8% damage to knocked enemies.' },
+    { id: 'dragon', name: 'DRAGON', ability: '+10% EP regen.' },
+    { id: 'robot', name: 'ROBOT', ability: '+5 shield on kill.' },
   ],
   pets: [
     { id: 'none', name: 'NONE', ability: 'No bonus.' },
@@ -938,7 +942,6 @@ let panelData = {
     { id: 'e3', name: 'KILL STREAK CHALLENGE', desc: 'Get a 5-kill streak.', reward: '500 COINS', claimed: false, active: true },
     { id: 'e4', name: 'SURVIVOR', desc: 'Survive 10 minutes in a single match.', reward: '300 COINS', claimed: false, active: true },
   ],
-  selectedPet: 'none',
   luckResult: 'SPIN TO WIN!',
 };
 
@@ -1180,33 +1183,6 @@ function populateClan() {
   }
 }
 
-// ---- PET ----
-function populatePet() {
-  const grid = document.getElementById('petGrid');
-  grid.innerHTML = '';
-  panelData.pets.forEach((pet) => {
-    const card = document.createElement('div');
-    card.className = 'pet-item';
-    const owned = pet.id === 'none' || panelData.vault.includes('pet_' + pet.id);
-    const equipped = panelData.selectedPet === pet.id;
-    card.innerHTML = `<div style="width:40px;height:40px;background:linear-gradient(135deg,#7ad3a1,#3ea8ff);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);"></div><div class="pet-name">${pet.name}</div><div style="font-size:8px;color:rgba(190,208,222,0.5);margin-top:2px;">${pet.ability}</div><button class="btn ${equipped ? 'ghost' : (owned ? 'primary' : 'ghost')}" style="min-width:60px;padding:5px 10px;font-size:8px;margin-top:6px;" ${!owned && pet.id !== 'none' ? 'disabled' : ''}>${equipped ? 'EQUIPPED' : (owned ? 'EQUIP' : 'LOCKED')}</button>`;
-    const btn = card.querySelector('button');
-    if (owned && !equipped) {
-      btn.addEventListener('click', () => {
-        panelData.selectedPet = pet.id;
-        savePanelData();
-        populatePet();
-        audio.click();
-        hud.toast('PET EQUIPPED: ' + pet.name, 'good');
-      });
-    }
-    grid.appendChild(card);
-  });
-  const sel = panelData.pets.find((p) => p.id === (panelData.selectedPet || 'none'));
-  document.getElementById('petCount').textContent = panelData.pets.filter((p) => p.id === 'none' || panelData.vault.includes('pet_' + p.id)).length + ' OWNED';
-  document.getElementById('petName').textContent = sel ? sel.name : 'NONE';
-}
-
 // ---- VAULT ----
 function populateVault() {
   const grid = document.getElementById('vaultGrid');
@@ -1314,7 +1290,6 @@ const panelPopulate = {
   shop: populateShop,
   events: populateEvents,
   clan: populateClan,
-  pet: populatePet,
   vault: populateVault,
   collection: populateCollection,
   rank: populateRank,
@@ -1983,7 +1958,6 @@ function startMatch() {
     startWeapon: selectedWeapon,
     ranked: rankedMode,
     rankName: rankFor(rankState.rp),
-    pet: panelData.selectedPet || 'none',
     net: gameRoom,
     humanCount: Math.max(1, humanCount),
     onEnd: (win, stats = {}) => {
