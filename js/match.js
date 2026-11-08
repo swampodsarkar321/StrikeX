@@ -48,7 +48,7 @@ function disposeObjectResources(root, keepGeometry = false) {
 }
 
 export class Match {
-  constructor({ scene, world, audio, effects, hud, camera, charId, onEnd, net = null, humanCount = 1, startWeapon = 'pistol', ranked = false, rankName = 'BRONZE V', pet = 'none' }) {
+  constructor({ scene, world, audio, effects, hud, camera, charId, onEnd, net = null, humanCount = 1, startWeapon = 'pistol', ranked = false, rankName = 'BRONZE V' }) {
     this.scene = scene;
     this.world = world;
     this.audio = audio;
@@ -62,7 +62,6 @@ export class Match {
     this.startWeapon = WEAPONS[startWeapon] ? startWeapon : 'pistol';
     this.ranked = !!ranked;
     this.rankName = rankName;
-    this.pet = pet || 'none';
 
     this.fighters = [];
     this.bots = [];
@@ -601,7 +600,7 @@ export class Match {
   updateEpAndHealing(dt) {
     const p = this.player;
     if (p.ep > 0 && p.health < p.maxHealth && this.time - (this.lastHurtAt || -10) > 3) {
-      const amt = Math.min(9 * (this.pet === 'dragon' ? 1.1 : 1) * dt, p.ep, p.maxHealth - p.health);
+      const amt = Math.min(9 * dt, p.ep, p.maxHealth - p.health);
       p.health += amt;
       p.ep -= amt;
     }
@@ -776,7 +775,6 @@ export class Match {
     const sprint = (c.keys.has('ShiftLeft') || c.sprint) && iz > 0.15 && !c.aiming && !c.firing;
     let speed = sprint ? 7.0 : 4.55;
     if (c.aiming) speed = 2.7;
-    if (this.pet === 'falcon') speed *= 1.05;
 
     const wish = new THREE.Vector3()
       .addScaledVector(fwd, iz)
@@ -892,7 +890,6 @@ export class Match {
     // damage multipliers from abilities
     let dmgMul = 1;
     if (this.abilityActive > 0 && this.charId === 'king') dmgMul *= 1.5;
-    if (this.pet === 'panther') dmgMul *= 1.08;
     if (this.luckyShots > 0) { dmgMul *= 2; this.luckyShots -= 1; }
     const shotDef = dmgMul === 1 ? def : { ...def, dmg: def.dmg * dmgMul };
 
@@ -1061,8 +1058,6 @@ export class Match {
 
       // Business passive: restore HP on elimination
       if (this.charId === 'business') this.player.heal(15);
-      // Robot pet: +5 shield on kill
-      if (this.pet === 'robot') this.player.addShield(5);
     }
 
     this.dropLoot(f.pos, f);
