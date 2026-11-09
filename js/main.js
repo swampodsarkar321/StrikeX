@@ -286,6 +286,7 @@ function selectCharacter(id) {
   $('#previewRole').textContent = cfg.role;
   document.documentElement.style.setProperty('--accent', cfg.color);
   setPreview(id);
+  savePlayerData({ charId: id }).catch(() => {});
 }
 
 // ------------------------------------------------------------- preview
@@ -362,9 +363,8 @@ function setPreview(charId) {
     // show two characters side by side
     pModel.root.position.set(-0.75, 0, 0);
     pRoot.add(pModel.root);
-    // partner preview: pick a different character index
-    const partnerIdx = (CHARACTERS.findIndex((c) => c.id === charId) + 1) % CHARACTERS.length;
-    const partnerCharId = CHARACTERS[partnerIdx].id;
+    // partner preview: use partner's actual charId if available, else pick next
+    const partnerCharId = (window.__duoPartner && window.__duoPartner.charId) ? window.__duoPartner.charId : CHARACTERS[(CHARACTERS.findIndex((c) => c.id === charId) + 1) % CHARACTERS.length].id;
     partnerPreview = createCharacterModel(partnerCharId);
     partnerPreview.root.position.set(0.75, 0, 0);
     partnerPreview.root.traverse((o) => {
@@ -2380,7 +2380,9 @@ async function checkDuoInvites() {
   if (ok) {
     await acceptDuoInvite(inv.fromId, inv.teamId);
     window.__duoTeamId = inv.teamId;
-    window.__duoPartner = { uid: inv.fromId, name: inv.fromName };
+    // fetch partner's data (including charId) from Firebase
+    const partnerData = await lookupPlayerByUsername(inv.fromName);
+    window.__duoPartner = partnerData || { uid: inv.fromId, name: inv.fromName };
     duoMode = true;
     refreshModeTabs();
     startMatchmaking();

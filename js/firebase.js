@@ -116,7 +116,7 @@ export async function loadPlayerData() {
     const snap = await Promise.race([snapPromise, timeoutPromise]);
     if (!snap || !snap.exists()) return null;
     const val = snap.val() || {};
-    return { rank: val.rank || null, armory: val.armory || null, level: val.level || 1, xp: val.xp || 0 };
+    return { rank: val.rank || null, armory: val.armory || null, level: val.level || 1, xp: val.xp || 0, charId: val.charId || null };
   } catch (err) {
     console.warn('[StrikeX] Failed to load player data.', err);
     return null;
@@ -296,7 +296,7 @@ export async function loadFriends() {
     const result = [];
     for (const uid of friendUids) {
       const p = players[uid];
-      if (p) result.push({ uid, name: p.name, level: p.level || 1, online: !!p.online, lastSeen: p.lastSeen || 0, rp: (p.rank && p.rank.rp) || 0 });
+      if (p) result.push({ uid, name: p.name, level: p.level || 1, online: !!p.online, lastSeen: p.lastSeen || 0, rp: (p.rank && p.rank.rp) || 0, charId: p.charId || 'swat' });
     }
     return result;
   } catch (err) {
