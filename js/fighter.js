@@ -459,8 +459,20 @@ export class Fighter {
   // ------------------------------------------------------------ emotes
   playEmote(id) {
     if (!this.alive || this.emoteT > 0) return;
+    const EMOTE_ANIM = {
+      wave: 'Wave',
+      dance: 'Kick_Right',
+      taunt: 'Punch_Right',
+      salute: 'Interact',
+      laugh: 'Idle_Neutral',
+      point: 'Kick_Left',
+      clap: 'Wave',
+      hype: 'Run',
+    };
     this.emoteId = id || 'wave';
     this.emoteT = 2.2; // seconds
+    const animName = EMOTE_ANIM[this.emoteId] || 'Wave';
+    this.play(animName, 0.14, true);
     // create floating text sprite
     if (this.emoteSprite) { this.root.remove(this.emoteSprite); this.emoteSprite = null; }
     const c = document.createElement('canvas');
@@ -494,6 +506,7 @@ export class Fighter {
     if (this.emoteT <= 0) {
       this.emoteT = 0;
       this.emoteId = null;
+      this.play('Idle_Gun', 0.18);
       if (this.emoteSprite) { this.root.remove(this.emoteSprite); this.emoteSprite = null; }
     }
   }

@@ -932,14 +932,14 @@ let panelData = {
     { id: 'skin_arctic', name: 'ARCTIC SKIN', price: 500, type: 'skin', owned: false },
     { id: 'skin_neon', name: 'NEON BLADE', price: 800, type: 'skin', owned: false },
     { id: 'skin_gold', name: 'GOLDEN AR', price: 1200, type: 'skin', owned: false },
-    { id: 'emote_wave', name: 'WAVE EMOTE', price: 300, type: 'emote', anim: 'wave', owned: false },
-    { id: 'emote_dance', name: 'DANCE EMOTE', price: 500, type: 'emote', anim: 'dance', owned: false },
-    { id: 'emote_taunt', name: 'TAUNT EMOTE', price: 400, type: 'emote', anim: 'taunt', owned: false },
-    { id: 'emote_salute', name: 'SALUTE EMOTE', price: 350, type: 'emote', anim: 'salute', owned: false },
-    { id: 'emote_laugh', name: 'LAUGH EMOTE', price: 450, type: 'emote', anim: 'laugh', owned: false },
-    { id: 'emote_point', name: 'POINT EMOTE', price: 250, type: 'emote', anim: 'point', owned: false },
-    { id: 'emote_clap', name: 'CLAP EMOTE', price: 300, type: 'emote', anim: 'clap', owned: false },
-    { id: 'emote_hype', name: 'HYPE EMOTE', price: 600, type: 'emote', anim: 'hype', owned: false },
+    { id: 'emote_wave', name: 'WAVE EMOTE', price: 0, type: 'emote', anim: 'wave', owned: false },
+    { id: 'emote_dance', name: 'DANCE EMOTE', price: 0, type: 'emote', anim: 'dance', owned: false },
+    { id: 'emote_taunt', name: 'TAUNT EMOTE', price: 0, type: 'emote', anim: 'taunt', owned: false },
+    { id: 'emote_salute', name: 'SALUTE EMOTE', price: 0, type: 'emote', anim: 'salute', owned: false },
+    { id: 'emote_laugh', name: 'LAUGH EMOTE', price: 0, type: 'emote', anim: 'laugh', owned: false },
+    { id: 'emote_point', name: 'POINT EMOTE', price: 0, type: 'emote', anim: 'point', owned: false },
+    { id: 'emote_clap', name: 'CLAP EMOTE', price: 0, type: 'emote', anim: 'clap', owned: false },
+    { id: 'emote_hype', name: 'HYPE EMOTE', price: 0, type: 'emote', anim: 'hype', owned: false },
     { id: 'banner_fire', name: 'FIRE BANNER', price: 400, type: 'banner', owned: false },
   ],
   events: [
@@ -1099,11 +1099,11 @@ function populateShop() {
     const card = document.createElement('div');
     card.className = 'shop-item';
     const owned = item.owned || panelData.vault.includes(item.id);
-    card.innerHTML = `<div style="width:48px;height:48px;background:linear-gradient(135deg,#ffb648,#ff5c8a);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);"></div><div class="shop-name">${item.name}</div><div class="shop-price">${owned ? 'OWNED' : item.price + ' COINS'}</div><button class="btn ${owned ? 'ghost' : 'primary'}" style="min-width:70px;padding:6px 12px;font-size:9px;margin-top:8px;" ${owned ? 'disabled' : ''}>${owned ? 'OWNED' : 'BUY'}</button>`;
+    card.innerHTML = `<div style="width:48px;height:48px;background:linear-gradient(135deg,#ffb648,#ff5c8a);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);"></div><div class="shop-name">${item.name}</div><div class="shop-price">${owned ? 'OWNED' : (item.price === 0 ? 'FREE' : item.price + ' COINS')}</div><button class="btn ${owned ? 'ghost' : 'primary'}" style="min-width:70px;padding:6px 12px;font-size:9px;margin-top:8px;" ${owned ? 'disabled' : ''}>${owned ? 'OWNED' : 'GET'}</button>`;
     const btn = card.querySelector('button');
     if (!owned) {
       btn.addEventListener('click', () => {
-        if (panelData.coins < item.price) { hud.toast('NOT ENOUGH COINS', 'warn'); return; }
+        if (item.price > 0 && panelData.coins < item.price) { hud.toast('NOT ENOUGH COINS', 'warn'); return; }
         panelData.coins -= item.price;
         item.owned = true;
         if (item.type === 'emote') {

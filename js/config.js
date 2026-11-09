@@ -208,14 +208,14 @@ export const GLOO_TTL = 25;
 //  emotes
 // ------------------------------------------------------------------
 export const EMOTES = [
-  { id: 'wave',    name: 'WAVE',      price: 300, anim: 'wave' },
-  { id: 'dance',   name: 'DANCE',     price: 500, anim: 'dance' },
-  { id: 'taunt',   name: 'TAUNT',     price: 400, anim: 'taunt' },
-  { id: 'salute',  name: 'SALUTE',    price: 350, anim: 'salute' },
-  { id: 'laugh',   name: 'LAUGH',     price: 450, anim: 'laugh' },
-  { id: 'point',   name: 'POINT',     price: 250, anim: 'point' },
-  { id: 'clap',    name: 'CLAP',      price: 300, anim: 'clap' },
-  { id: 'hype',    name: 'HYPE',      price: 600, anim: 'hype' },
+  { id: 'wave',    name: 'WAVE',      price: 0, anim: 'wave' },
+  { id: 'dance',   name: 'DANCE',     price: 0, anim: 'kick_right' },
+  { id: 'taunt',   name: 'TAUNT',     price: 0, anim: 'punch_right' },
+  { id: 'salute',  name: 'SALUTE',    price: 0, anim: 'interact' },
+  { id: 'laugh',   name: 'LAUGH',     price: 0, anim: 'idle_neutral' },
+  { id: 'point',   name: 'POINT',     price: 0, anim: 'kick_left' },
+  { id: 'clap',    name: 'CLAP',      price: 0, anim: 'wave' },
+  { id: 'hype',    name: 'HYPE',      price: 0, anim: 'run' },
 ];
 
 export const COIN_REWARD_BASE = 500;
