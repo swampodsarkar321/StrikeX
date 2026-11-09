@@ -37,6 +37,8 @@ export class HUD {
       endSub: $('#endSub'),
       endStats: $('#endStats'),
       epFill: $('#epFill'),
+      partnerTrack: $('#partnerTrack'),
+      partnerFill: $('#partnerFill'),
       abilityChip: $('#abilityChip'),
       abilityName: $('#abilityName'),
       abilityCd: $('#abilityCd'),
@@ -153,6 +155,15 @@ export class HUD {
     this.el.shFill.style.width = `${(p.shield / p.maxShield) * 100}%`;
     if (this.el.epFill) this.el.epFill.style.width = `${((p.ep || 0) / EP_MAX) * 100}%`;
     this.el.hpFill.classList.toggle('low', p.health <= 30);
+
+    // duo partner HP
+    if (M.partner && this.el.partnerTrack) {
+      this.el.partnerTrack.classList.toggle('visible', M.duoMode);
+      this.el.partnerTrack.classList.toggle('dead', !M.partner.alive);
+      this.el.partnerFill.style.width = `${M.partner.alive ? (M.partner.health / M.partner.maxHealth) * 100 : 0}%`;
+    } else if (this.el.partnerTrack) {
+      this.el.partnerTrack.classList.remove('visible', 'dead');
+    }
 
     // match stats
     this.el.alive.textContent = M.alive;

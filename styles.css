@@ -3180,3 +3180,38 @@ body:not(.in-match) #game {
   text-transform: uppercase;
 }
 
+
+/* ===== duo partner HUD ===== */
+.partner-track {
+  position: relative;
+  margin-top: 4px;
+  height: 6px;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 3px;
+  overflow: hidden;
+  display: none;
+}
+.partner-track.visible { display: block; }
+.partner-tag {
+  position: absolute;
+  left: 0;
+  top: -1px;
+  font-size: 6px;
+  letter-spacing: 0.24em;
+  color: rgba(126, 224, 138, 0.75);
+}
+.partner-hp-track {
+  height: 100%;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.45);
+}
+.fill.partner-hp {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #7ee08a, #3ea8ff);
+  border-radius: 3px;
+  transition: width 0.15s linear;
+}
+.partner-track.dead .partner-hp { background: #ff4d5e; }
+

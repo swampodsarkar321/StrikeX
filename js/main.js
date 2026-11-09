@@ -92,17 +92,19 @@ async function syncRankFromCloud() {
 }
 
 let rankedMode = false;
+let duoMode = false;
 
 function refreshRankUI() {
   const el = $('#rankChip');
   if (el) el.textContent = rankFor(rankState.rp);
 }
 function refreshModeTabs() {
-  const c = $('#tabClassic'), r = $('#tabRanked');
-  if (c) c.classList.toggle('active', !rankedMode);
-  if (r) r.classList.toggle('active', rankedMode);
+  const c = $('#tabClassic'), r = $('#tabRanked'), d = $('#tabDuo');
+  if (c) c.classList.toggle('active', !rankedMode && !duoMode);
+  if (r) r.classList.toggle('active', rankedMode && !duoMode);
+  if (d) d.classList.toggle('active', duoMode);
   const sub = $('#startModeSub');
-  if (sub) sub.textContent = (rankedMode ? 'RANKED' : 'CLASSIC') + ' · BERMUDA';
+  if (sub) sub.textContent = duoMode ? 'DUO · BERMUDA' : (rankedMode ? 'RANKED' : 'CLASSIC') + ' · BERMUDA';
 }
 
 // --------------------------------------------------------- leveling system
@@ -1580,16 +1582,25 @@ syncSettingsUI();
 
 const tabClassic = $('#tabClassic');
 const tabRanked = $('#tabRanked');
+const tabDuo = $('#tabDuo');
 if (tabClassic) tabClassic.addEventListener('click', () => {
   if (!loaded) return;
   audio.init(); audio.click();
   rankedMode = false;
+  duoMode = false;
   refreshModeTabs();
 });
 if (tabRanked) tabRanked.addEventListener('click', () => {
   if (!loaded) return;
   audio.init(); audio.click();
   rankedMode = true;
+  duoMode = false;
+  refreshModeTabs();
+});
+if (tabDuo) tabDuo.addEventListener('click', () => {
+  if (!loaded) return;
+  audio.init(); audio.click();
+  duoMode = true;
   refreshModeTabs();
 });
 refreshModeTabs();
@@ -2051,6 +2062,7 @@ function startMatch() {
     startWeapon: selectedWeapon,
     equippedEmote: panelData.equippedEmote || null,
     ranked: rankedMode,
+    duoMode: duoMode,
     rankName: rankFor(rankState.rp),
     net: gameRoom,
     humanCount: Math.max(1, humanCount),

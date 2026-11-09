@@ -49,7 +49,7 @@ function disposeObjectResources(root, keepGeometry = false) {
 }
 
 export class Match {
-  constructor({ scene, world, audio, effects, hud, camera, charId, onEnd, net = null, humanCount = 1, startWeapon = 'pistol', ranked = false, rankName = 'BRONZE V', equippedEmote = null }) {
+  constructor({ scene, world, audio, effects, hud, camera, charId, onEnd, net = null, humanCount = 1, startWeapon = 'pistol', ranked = false, rankName = 'BRONZE V', equippedEmote = null, duoMode = false }) {
     this.scene = scene;
     this.world = world;
     this.audio = audio;
@@ -63,6 +63,7 @@ export class Match {
     this.startWeapon = WEAPONS[startWeapon] ? startWeapon : 'pistol';
     this.ranked = !!ranked;
     this.rankName = rankName;
+    this.duoMode = !!duoMode;
     this.equippedEmote = equippedEmote || null;
 
     this.fighters = [];
@@ -150,9 +151,41 @@ export class Match {
   }
 
   spawnBots() {
+    const maxBots = Math.max(0, MAX_PLAYERS - this.humanCount);
+    if (this.duoMode && this.humanCount === 1) {
+      // spawn AI partner at player's location
+      const pool = shuffle(CHARACTERS.filter((c) => c.id !== this.charId).slice());
+      const cfg = pool[0];
+      const b = new Fighter({
+        charId: cfg.id,
+        name: 'PARTNER',
+        scene: this.scene,
+        charColor: '#3ea8ff',
+      });
+      b.place(this.player.pos.x + 2, this.player.pos.z + 2);
+      b.yaw = Math.random() * TAU;
+      b.vel = new THREE.Vector3();
+      b.yOffset = 0;
+      b.weapon = 'rifle';
+      b.setWeapon(b.weapon);
+      b.skill = 0.9;
+      b.thinkT = Math.random() * 0.5;
+      b.fireCd = rand(0.6, 2.2);
+      b.aimTime = rand(0.3, 0.9);
+      b.strafeDir = Math.random() < 0.5 ? -1 : 1;
+      b.strafeT = rand(0.8, 2.2);
+      b.target = null;
+      b.wander = null;
+      b.urgent = false;
+      b.isPartner = true;
+      this.scene.add(b.root);
+      this.fighters.push(b);
+      this.bots.push(b);
+      this.partner = b;
+    }
+    const botCount = this.duoMode ? maxBots - 1 : maxBots;
     const pool = shuffle(CHARACTERS.filter((c) => c.id !== this.charId).slice());
     const usedNames = shuffle(BOT_NAMES.slice());
-    const botCount = Math.max(0, MAX_PLAYERS - this.humanCount);
     for (let i = 0; i < botCount; i++) {
       const cfg = pool[i % pool.length];
       const b = new Fighter({
@@ -162,7 +195,7 @@ export class Match {
         charColor: cfg.color,
       });
       const pts = this.spawnPoints || getSpawnPoints(MAX_PLAYERS) || [];
-      const slot = pts[(i + 1) % (pts.length || 1)] || { x: (i % 4 - 1.5) * 30, z: (Math.floor(i / 4) - 2) * 30 };
+      const slot = pts[(i + 1 + (this.duoMode && this.partner ? 1 : 0)) % (pts.length || 1)] || { x: (i % 4 - 1.5) * 30, z: (Math.floor(i / 4) - 2) * 30 };
       const ox = (Math.random() - 0.5) * 6;
       const oz = (Math.random() - 0.5) * 6;
       b.place(slot.x + ox, slot.z + oz);
@@ -1105,7 +1138,8 @@ export class Match {
       this.endMatch(false);
       return;
     }
-    if (this.alive <= 1 && this.player.alive) {
+    const winThreshold = this.duoMode ? 2 : 1;
+    if (this.alive <= winThreshold && this.player.alive) {
       this.endMatch(true);
     }
   }
@@ -1208,7 +1242,8 @@ export class Match {
 
       if (b.thinkT <= 0) {
         b.thinkT = rand(0.28, 0.5);
-        this.botThink(b);
+        if (b.isPartner) this.partnerThink(b);
+        else this.botThink(b);
       }
       if (b.strafeT <= 0) {
         b.strafeT = rand(1.3, 2.8);
@@ -1216,6 +1251,26 @@ export class Match {
       }
       this.botMove(b, dt);
       this.botCombat(b, dt);
+    }
+  }
+
+  partnerThink(b) {
+    const z = this.zone;
+    const dc = Math.hypot(b.pos.x - this.player.pos.x, b.pos.z - this.player.pos.z);
+    b.urgent = dc > 25 || z.state === 'final';
+
+    const prev = b.target;
+    b.target = this.findTarget(b);
+    if (b.target && b.target !== prev) b.aimTime = rand(0.45, 0.95);
+
+    if (!b.target) {
+      // stay near player
+      const pdx = this.player.pos.x - b.pos.x, pdz = this.player.pos.z - b.pos.z;
+      const pd = Math.hypot(pdx, pdz);
+      if (pd > 8) b.wander = new THREE.Vector3(this.player.pos.x, 0, this.player.pos.z);
+      else b.wander = null;
+    } else {
+      b.wander = null;
     }
   }
 
