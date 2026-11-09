@@ -320,6 +320,7 @@ export async function loadFriendRequests() {
     return [];
   }
 }
+export async function loadEvents() {
   let bundle;
   try { bundle = await ensureFirebase(); } catch { return []; }
   const { db, mod } = bundle;
