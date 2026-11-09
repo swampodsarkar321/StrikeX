@@ -199,6 +199,144 @@ export async function claimMail(uid, mailKey, path) {
   }
 }
 
+export async function sendFriendRequest(targetUsername) {
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return { ok: false, reason: 'NOT_LOGGED_IN' };
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return { ok: false, reason: 'OFFLINE' }; }
+  const { db, mod } = bundle;
+  const targetName = String(targetUsername || '').trim().replace(/\s+/g, '');
+  if (!/^[A-Za-z0-9_.]{3,16}$/.test(targetName)) return { ok: false, reason: 'INVALID_NAME' };
+  if (targetName.toLowerCase() === profile.username.toLowerCase()) return { ok: false, reason: 'SELF' };
+  try {
+    const nameSnap = await mod.get(mod.ref(db, `${DB_ROOT}/usernames/${targetName.toLowerCase()}`));
+    if (!nameSnap.exists()) return { ok: false, reason: 'USER_NOT_FOUND' };
+    const claim = nameSnap.val();
+    const targetUid = claim.uid;
+    // check not already friend
+    const friendsSnap = await mod.get(mod.ref(db, `${DB_ROOT}/friends/${profile.uid}`));
+    const friends = friendsSnap.exists() ? (friendsSnap.val() || []) : [];
+    if (friends.includes(targetUid)) return { ok: false, reason: 'ALREADY_FRIEND' };
+    // check not already requested
+    const reqSnap = await mod.get(mod.ref(db, `${DB_ROOT}/friendRequests/${targetUid}`));
+    const reqs = reqSnap.exists() ? (reqSnap.val() || []) : [];
+    if (reqs.some((r) => r.fromId === profile.uid)) return { ok: false, reason: 'ALREADY_REQUESTED' };
+    // send request
+    reqs.push({ fromId: profile.uid, fromName: profile.username, createdAt: Date.now() });
+    await mod.set(mod.ref(db, `${DB_ROOT}/friendRequests/${targetUid}`), reqs);
+    return { ok: true };
+  } catch (err) {
+    console.error('sendFriendRequest failed', err);
+    return { ok: false, reason: 'ERROR' };
+  }
+}
+
+export async function acceptFriendRequest(fromId) {
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return false;
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return false; }
+  const { db, mod } = bundle;
+  try {
+    // remove from my requests
+    const reqSnap = await mod.get(mod.ref(db, `${DB_ROOT}/friendRequests/${profile.uid}`));
+    const reqs = reqSnap.exists() ? (reqSnap.val() || []) : [];
+    const fromReq = reqs.find((r) => r.fromId === fromId);
+    if (!fromReq) return false;
+    // add to my friends
+    const myFriendsSnap = await mod.get(mod.ref(db, `${DB_ROOT}/friends/${profile.uid}`));
+    const myFriends = myFriendsSnap.exists() ? (myFriendsSnap.val() || []) : [];
+    if (!myFriends.includes(fromId)) myFriends.push(fromId);
+    await mod.set(mod.ref(db, `${DB_ROOT}/friends/${profile.uid}`), myFriends);
+    // add to their friends
+    const theirFriendsSnap = await mod.get(mod.ref(db, `${DB_ROOT}/friends/${fromId}`));
+    const theirFriends = theirFriendsSnap.exists() ? (theirFriendsSnap.val() || []) : [];
+    if (!theirFriends.includes(profile.uid)) theirFriends.push(profile.uid);
+    await mod.set(mod.ref(db, `${DB_ROOT}/friends/${fromId}`), theirFriends);
+    // remove from my requests
+    const newReqs = reqs.filter((r) => r.fromId !== fromId);
+    await mod.set(mod.ref(db, `${DB_ROOT}/friendRequests/${profile.uid}`), newReqs);
+    return true;
+  } catch (err) {
+    console.error('acceptFriendRequest failed', err);
+    return false;
+  }
+}
+
+export async function rejectFriendRequest(fromId) {
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return false;
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return false; }
+  const { db, mod } = bundle;
+  try {
+    const reqSnap = await mod.get(mod.ref(db, `${DB_ROOT}/friendRequests/${profile.uid}`));
+    const reqs = reqSnap.exists() ? (reqSnap.val() || []) : [];
+    const newReqs = reqs.filter((r) => r.fromId !== fromId);
+    await mod.set(mod.ref(db, `${DB_ROOT}/friendRequests/${profile.uid}`), newReqs);
+    return true;
+  } catch (err) {
+    console.error('rejectFriendRequest failed', err);
+    return false;
+  }
+}
+
+export async function loadFriends() {
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return [];
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return []; }
+  const { db, mod } = bundle;
+  try {
+    const friendsSnap = await mod.get(mod.ref(db, `${DB_ROOT}/friends/${profile.uid}`));
+    const friendUids = friendsSnap.exists() ? (friendsSnap.val() || []) : [];
+    if (friendUids.length === 0) return [];
+    const playersSnap = await mod.get(mod.ref(db, `${DB_ROOT}/players`));
+    const players = playersSnap.exists() ? playersSnap.val() : {};
+    const result = [];
+    for (const uid of friendUids) {
+      const p = players[uid];
+      if (p) result.push({ uid, name: p.name, level: p.level || 1, online: !!p.online, lastSeen: p.lastSeen || 0, rp: (p.rank && p.rank.rp) || 0 });
+    }
+    return result;
+  } catch (err) {
+    console.error('loadFriends failed', err);
+    return [];
+  }
+}
+
+export async function loadFriendRequests() {
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return [];
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return []; }
+  const { db, mod } = bundle;
+  try {
+    const reqSnap = await mod.get(mod.ref(db, `${DB_ROOT}/friendRequests/${profile.uid}`));
+    const reqs = reqSnap.exists() ? (reqSnap.val() || []) : [];
+    return reqs;
+  } catch (err) {
+    console.error('loadFriendRequests failed', err);
+    return [];
+  }
+}
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return []; }
+  const { db, mod } = bundle;
+  try {
+    const snap = await withTimeout(mod.get(mod.ref(db, `${DB_ROOT}/events`)));
+    if (!snap.exists()) return [];
+    const events = [];
+    snap.forEach((child) => {
+      const v = child.val();
+      if (v) events.push({ id: child.key, ...v });
+    });
+    return events;
+  } catch (err) {
+    console.warn('[StrikeX] loadEvents failed', err);
+    return [];
+  }
+}
 export async function loadEvents() {
   let bundle;
   try { bundle = await ensureFirebase(); } catch { return []; }
@@ -217,6 +355,7 @@ export async function loadEvents() {
     return [];
   }
 }
+
 export async function lookupPlayerByUsername(rawName) {
   const name = String(rawName || '').trim().replace(/\s+/g, '');
   if (!/^[A-Za-z0-9_.]{3,16}$/.test(name)) return null;

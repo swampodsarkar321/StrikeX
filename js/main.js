@@ -10,7 +10,7 @@ import { HUD } from './hud.js';
 import { Match } from './match.js';
 import { AudioSys } from './audio.js?v=2';
 import { initAuth, getProfile } from './auth.js?v=1';
-import { getSavedProfile, loginWithUsername, loadPlayerData, savePlayerData, lookupPlayerByUsername, loadLeaderboard, loadPlayerMail, claimMail, loadEvents } from './firebase.js?v=1';
+import { getSavedProfile, loginWithUsername, loadPlayerData, savePlayerData, lookupPlayerByUsername, loadLeaderboard, loadPlayerMail, claimMail, loadEvents, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, loadFriends, loadFriendRequests } from './firebase.js?v=1';
 
 const $ = (s) => document.querySelector(s);
 const clamp = THREE.MathUtils.clamp;
@@ -881,6 +881,39 @@ if (friendsTool) friendsTool.addEventListener('click', () => openPanel('friends'
 if (mailTool) mailTool.addEventListener('click', () => openPanel('mail'));
 
 // invite button
+function startDuoMatch(friend) {
+  duoMode = true;
+  refreshModeTabs();
+  startMatchmaking();
+}
+
+function populateInvite() {
+  const list = document.getElementById('inviteList');
+  if (!list) return;
+  list.innerHTML = '<div class="panel-note" style="margin-top:20px;">Loading friends...</div>';
+  loadFriends().then((friends) => {
+    list.innerHTML = '';
+    const online = friends.filter((f) => f.online);
+    if (online.length === 0) {
+      list.innerHTML = '<div class="panel-note" style="margin-top:20px;">No online friends. Waiting for friends to come online...</div>';
+      return;
+    }
+    online.forEach((f) => {
+      const row = document.createElement('div');
+      row.className = 'friend-item';
+      row.innerHTML = `<div style="flex:1"><div class="mail-title">${f.name}</div><div class="mail-desc">ONLINE · LV.${f.level} · ${f.rp} RP</div></div><button class="btn primary" style="min-width:80px;padding:6px 12px;font-size:9px;">PLAY DUO</button>`;
+      const btn = row.querySelector('button');
+      btn.addEventListener('click', () => {
+        audio.init(); audio.click();
+        // start duo match with this friend as teammate
+        startDuoMatch(f);
+      });
+      list.appendChild(row);
+    });
+  });
+}
+
+// invite button wiring (panel already opens; just populate)
 const inviteBtn = document.querySelector('.invite-btn');
 if (inviteBtn) inviteBtn.addEventListener('click', () => openPanel('invite'));
 
@@ -1079,31 +1112,53 @@ async function populateMail() {
 }
 
 // ---- FRIENDS ----
-function populateFriends() {
+async function populateFriends() {
   const list = document.getElementById('friendsList');
-  list.innerHTML = '';
-  if (panelData.friends.length === 0) {
-    list.innerHTML = '<div class="panel-note" style="margin-top:20px;">No friends yet. Add by username.</div>';
+  list.innerHTML = '<div class="panel-note" style="margin-top:20px;">Loading friends...</div>';
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) {
+    list.innerHTML = '<div class="panel-note" style="margin-top:20px;">Login to see friends.</div>';
     document.getElementById('friendsCount').textContent = '0 FRIENDS';
     return;
   }
-  // lookup online status for each friend
-  Promise.all(panelData.friends.map((f) => lookupPlayerByUsername(f))).then((results) => {
-    list.innerHTML = '';
-    panelData.friends.forEach((f, i) => {
-      const info = results[i];
-      const online = info ? info.online : false;
-      const level = info ? info.level : '?';
+  const [friends, reqs] = await Promise.all([loadFriends(), loadFriendRequests()]);
+  list.innerHTML = '';
+  // pending requests first
+  if (reqs.length > 0) {
+    const reqHeader = document.createElement('div');
+    reqHeader.className = 'panel-note';
+    reqHeader.textContent = 'PENDING REQUESTS';
+    list.appendChild(reqHeader);
+    reqs.forEach((r) => {
       const row = document.createElement('div');
       row.className = 'friend-item';
-      row.innerHTML = `<div style="flex:1"><div class="mail-title">${f}</div><div class="mail-desc">${online ? 'ONLINE' : 'OFFLINE'} · LV. ${level}</div></div><button class="btn ghost" style="min-width:60px;padding:6px 10px;font-size:9px;">INVITE</button><button class="btn ghost" style="min-width:60px;padding:6px 10px;font-size:9px;">REMOVE</button>`;
+      row.innerHTML = `<div style="flex:1"><div class="mail-title">${r.fromName}</div><div class="mail-desc">FRIEND REQUEST</div></div><button class="btn primary" style="min-width:60px;padding:6px 10px;font-size:9px;">ACCEPT</button><button class="btn ghost" style="min-width:60px;padding:6px 10px;font-size:9px;">REJECT</button>`;
       const btns = row.querySelectorAll('button');
-      btns[0].addEventListener('click', () => { audio.click(); hud.toast('INVITE SENT TO ' + f, 'good'); });
-      btns[1].addEventListener('click', () => { panelData.friends.splice(i, 1); savePanelData(); populateFriends(); audio.click(); });
+      btns[0].addEventListener('click', async () => { const ok = await acceptFriendRequest(r.fromId); if (ok) { hud.toast('FRIEND ADDED: ' + r.fromName, 'good'); populateFriends(); } else { hud.toast('FAILED', 'warn'); } });
+      btns[1].addEventListener('click', async () => { const ok = await rejectFriendRequest(r.fromId); if (ok) { hud.toast('REQUEST REJECTED', 'warn'); populateFriends(); } });
       list.appendChild(row);
     });
-    document.getElementById('friendsCount').textContent = panelData.friends.length + ' FRIENDS';
-  });
+  }
+  // friends list
+  if (friends.length === 0) {
+    if (reqs.length === 0) list.innerHTML += '<div class="panel-note" style="margin-top:20px;">No friends yet. Add by username.</div>';
+  } else {
+    if (reqs.length > 0) {
+      const fHeader = document.createElement('div');
+      fHeader.className = 'panel-note';
+      fHeader.textContent = 'FRIENDS';
+      list.appendChild(fHeader);
+    }
+    friends.forEach((f) => {
+      const row = document.createElement('div');
+      row.className = 'friend-item';
+      row.innerHTML = `<div style="flex:1"><div class="mail-title">${f.name}</div><div class="mail-desc">${f.online ? 'ONLINE' : 'OFFLINE'} · LV.${f.level} · ${f.rp} RP</div></div><button class="btn ghost" style="min-width:60px;padding:6px 10px;font-size:9px;">INVITE</button>`;
+      const btn = row.querySelector('button');
+      btn.addEventListener('click', () => { audio.click(); hud.toast('INVITE SENT TO ' + f.name, 'good'); });
+      list.appendChild(row);
+    });
+  }
+  document.getElementById('friendsCount').textContent = friends.length + ' FRIENDS';
 }
 
 // ---- SHOP ----
@@ -1352,7 +1407,7 @@ const panelPopulate = {
   collection: populateCollection,
   rank: populateRank,
   luck: populateLuck,
-  invite: () => {},
+  invite: populateInvite,
 };
 
 // ---- wire friends add ----
@@ -1362,19 +1417,15 @@ if (friendAddBtn) {
     const input = document.getElementById('friendInput');
     const name = (input.value || '').trim();
     if (!name) { hud.toast('ENTER A USERNAME', 'warn'); return; }
-    if (panelData.friends.includes(name)) { hud.toast('ALREADY A FRIEND', 'warn'); return; }
-    // verify the player exists on Firebase
-    const found = await lookupPlayerByUsername(name);
-    if (found === null) {
-      // offline or not found — allow adding anyway (offline fallback)
-      hud.toast('PLAYER NOT FOUND ONLINE — ADDED LOCALLY', 'warn');
+    const result = await sendFriendRequest(name);
+    if (result.ok) {
+      hud.toast('REQUEST SENT TO ' + name.toUpperCase(), 'good');
+      input.value = '';
+      populateFriends();
     } else {
-      hud.toast('PLAYER FOUND: ' + found.username + (found.online ? ' (ONLINE)' : ''), 'good');
+      const msgs = { USER_NOT_FOUND: 'PLAYER NOT FOUND', SELF: "CAN'T ADD YOURSELF", ALREADY_FRIEND: 'ALREADY FRIENDS', ALREADY_REQUESTED: 'REQUEST ALREADY SENT', INVALID_NAME: 'INVALID NAME', NOT_LOGGED_IN: 'LOGIN FIRST', OFFLINE: 'OFFLINE' };
+      hud.toast(msgs[result.reason] || 'FAILED', 'warn');
     }
-    panelData.friends.push(name);
-    savePanelData();
-    populateFriends();
-    input.value = '';
     audio.click();
   });
 }
