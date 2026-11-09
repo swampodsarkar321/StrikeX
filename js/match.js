@@ -797,7 +797,7 @@ export class Match {
       .addScaledVector(right, ix);
     if (wish.lengthSq() > 0) wish.normalize().multiplyScalar(speed);
 
-    const accel = p.grounded ? 18 : 7;
+    const accel = p.grounded ? 26 : 12;
     p.vel.x = damp(p.vel.x, wish.x, accel, dt);
     p.vel.z = damp(p.vel.z, wish.z, accel, dt);
     p.pos.x += p.vel.x * dt;

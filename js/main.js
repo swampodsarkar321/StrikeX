@@ -898,6 +898,7 @@ let panelData = {
   gems: 0,
   tickets: 0,
   stats: { matches: 0, wins: 0, kills: 0, damage: 0, headshots: 0, surviveSec: 0, bestPlacement: 99 },
+  history: [],
   mail: [
     { id: 'm1', title: 'WELCOME REWARD', desc: 'Thanks for joining StrikeX!', reward: '50 COINS', claimed: false },
     { id: 'm2', title: 'DAILY LOGIN', desc: 'Day 1 reward — keep coming back.', reward: '100 COINS', claimed: false },
@@ -997,6 +998,18 @@ function populateStats() {
   document.getElementById('stLevel').textContent = profileState.level;
   document.getElementById('stRank').textContent = rankFor(rankState.rp);
   document.getElementById('stName').textContent = getProfile().username || 'PLAYER';
+
+  // history
+  const histEl = document.getElementById('stHistory');
+  if (histEl) {
+    const list = (panelData.history || []).map(m => {
+      const d = new Date(m.date);
+      const dateStr = `${d.getMonth()+1}/${d.getDate()}`;
+      const place = m.placement === 1 ? '<b class="win">WIN</b>' : `#${m.placement}`;
+      return `<div><span>${dateStr}</span> · <b>${m.kills}</b> kills · ${place} · ${m.damage} dmg</div>`;
+    });
+    histEl.innerHTML = list.length ? list.join('') : '<div>NO MATCHES YET</div>';
+  }
 }
 
 // ---- MAIL ----
@@ -1405,6 +1418,19 @@ window.__updateStatsAfterMatch = (stats) => {
   if (stats.kills > (s.bestKills || 0)) s.bestKills = stats.kills;
   if (stats.placement && (s.bestPlacement === 99 || stats.placement < s.bestPlacement)) s.bestPlacement = stats.placement;
   if (stats.placement === 1) s.wins += 1;
+  // --- match history: keep last 12 matches ------------------------------
+  const histEntry = {
+    date: Date.now(),
+    kills: stats.kills || 0,
+    placement: stats.placement || 99,
+    win: (stats.placement === 1),
+    damage: Math.round(stats.damage || 0),
+    charId: selected || 'swat',
+  };
+  panelData.history = panelData.history || [];
+  panelData.history.unshift(histEntry);
+  if (panelData.history.length > 12) panelData.history.length = 12;
+
   if (stats.time) {
     const parts = stats.time.split(':');
     s.surviveSec += (parseInt(parts[0] || '0', 10) * 60) + parseInt(parts[1] || '0', 10);
@@ -2058,7 +2084,8 @@ function startMatch() {
         savePanelData();
         refreshCoins();
       }
-      const xpGain = stats.xpGain || 0;
+      const doubleXp = panelData.events && panelData.events.some((e) => e.id === 'e1' && e.active !== false);
+      const xpGain = (stats.xpGain || 0) * (doubleXp ? 2 : 1);
       const oldLevel = profileState.level;
       profileState.xp += xpGain;
       while (profileState.xp >= xpToNext(profileState.level)) {
