@@ -2123,7 +2123,7 @@ function updateCamera(dt) {
   camera.rotation.set(pitch, yaw, 0);
   camDir.set(0, 0, -1).applyEuler(camera.rotation).normalize();
 
-  const crouchY = (this.controls && this.controls.crouch && p.grounded) ? 0.35 : 0;
+  const crouchY = (controls && controls.crouch && p.grounded) ? 0.35 : 0;
   camTarget.set(p.pos.x, p.pos.y + (p.grounded ? 1.18 - crouchY : 1.2), p.pos.z);
   camRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
   camTarget.addScaledVector(camRight, aiming ? 0.5 : 0.62);
