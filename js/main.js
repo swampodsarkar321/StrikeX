@@ -176,7 +176,7 @@ const controls = {
   yaw: 0, pitch: 0, keys,
   firing: false, aiming: false, pendingShot: false,
   aimDir: new THREE.Vector3(0, 0, -1),
-  move: { x: 0, y: 0 }, sprint: false, jump: false,
+  move: { x: 0, y: 0 }, sprint: false, jump: false, crouch: false,
 };
 
 // ------------------------------------------------------------- settings
@@ -1610,6 +1610,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyF') match.useAbility();
   if (e.code === 'KeyG') match.placeGloo(controls);
   if (e.code === 'KeyV') match.useEmote(match.equippedEmote);
+  if (e.code === 'KeyC') controls.crouch = !controls.crouch;
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => {
@@ -2122,12 +2123,13 @@ function updateCamera(dt) {
   camera.rotation.set(pitch, yaw, 0);
   camDir.set(0, 0, -1).applyEuler(camera.rotation).normalize();
 
-  camTarget.set(p.pos.x, p.pos.y + (p.grounded ? 1.18 : 1.2), p.pos.z);
+  const crouchY = (this.controls && this.controls.crouch && p.grounded) ? 0.35 : 0;
+  camTarget.set(p.pos.x, p.pos.y + (p.grounded ? 1.18 - crouchY : 1.2), p.pos.z);
   camRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
   camTarget.addScaledVector(camRight, aiming ? 0.5 : 0.62);
 
   camBack.copy(camDir).negate();
-  let dist = aiming ? 2.3 : 4.3;
+  let dist = aiming ? 2.0 : 3.6;
 
   camRay.set(camTarget, camBack);
   camRay.far = dist;

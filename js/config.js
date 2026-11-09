@@ -69,6 +69,7 @@ export const WEAPONS = {
     spread: 0.0012, pellets: 1, auto: false, reload: 2.5, range: 340,
     recoil: 0.05, adsFov: 24, color: 0xff5c8a, sound: 'sniper',
     glb: './gun/Sniper Rifle.glb',
+    pen: true, penWall: 1,
   },
   assault2: {
     id: 'assault2', name: 'AR-QUAKE', dmg: 23, rpm: 640, mag: 30, reserve: 150,
@@ -153,18 +154,21 @@ export const WEAPONS = {
     spread: 0.0012, pellets: 1, auto: false, reload: 2.5, range: 340,
     recoil: 0.05, adsFov: 24, color: 0xff5c8a, sound: 'sniper',
     glb: './gun/Sniper Rifle-ASOMZIErq3.glb',
+    pen: true, penWall: 1,
   },
   sniper3: {
     id: 'sniper3', name: 'AWM-LIGHT', dmg: 90, rpm: 44, mag: 5, reserve: 20,
     spread: 0.0013, pellets: 1, auto: false, reload: 2.4, range: 335,
     recoil: 0.048, adsFov: 24, color: 0xff5c8a, sound: 'sniper',
     glb: './gun/Sniper Rifle-i65hEldsw6.glb',
+    pen: true, penWall: 1,
   },
   sniper4: {
     id: 'sniper4', name: 'AWM-GREEN', dmg: 88, rpm: 44, mag: 5, reserve: 20,
     spread: 0.0013, pellets: 1, auto: false, reload: 2.4, range: 330,
     recoil: 0.046, adsFov: 24, color: 0xff5c8a, sound: 'sniper',
     glb: './gun/Sniper Rifle-TKaBjAEofL.glb',
+    pen: true, penWall: 1,
   },
 };
 

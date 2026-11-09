@@ -790,6 +790,7 @@ export class Match {
     const sprint = (c.keys.has('ShiftLeft') || c.sprint) && iz > 0.15 && !c.aiming && !c.firing;
     let speed = sprint ? 7.0 : 4.55;
     if (c.aiming) speed = 2.7;
+    if (c.crouch) speed = 2.2;
 
     const wish = new THREE.Vector3()
       .addScaledVector(fwd, iz)
@@ -948,12 +949,13 @@ export class Match {
 
     this.raycaster.set(origin, dir);
     this.raycaster.far = def.range;
-    const hits = this.raycaster.intersectObjects(targets, false);
+    let hits = this.raycaster.intersectObjects(targets, false);
 
     let point = null;
     let target = null;
     let headshot = false;
     let dist = def.range;
+    let penetrated = false; // ceiling removed for sniper wall penetration
 
     if (hits.length) {
       const h = hits[0];
@@ -967,6 +969,23 @@ export class Match {
       } else if (h.object.userData.fighter) {
         target = h.object.userData.fighter;
         headshot = !!h.object.userData.headshot;
+      } else if (def.pen && def.penWall && !penetrated) {
+        // sniper round punches through one thin wall
+        penetrated = true;
+        const after = hits.slice(1);
+        if (after.length) {
+          const h2 = after[0];
+          dist = h2.distance;
+          point = h2.point.clone();
+          const wall2 = h2.object.userData.glooWall;
+          if (wall2) {
+            wall2.hp -= def.dmg * 0.7;
+            if (wall2.hp <= 0) this.removeGlooWall(wall2);
+          } else if (h2.object.userData.fighter) {
+            target = h2.object.userData.fighter;
+            headshot = !!h2.object.userData.headshot;
+          }
+        }
       }
     }
 
@@ -983,11 +1002,16 @@ export class Match {
 
     if (target) {
       const falloff = def.id === 'shotgun' ? Math.max(0.25, 1 - (dist / def.range) * 0.95) : 1;
-      const dmg = def.dmg * falloff * (headshot ? 2 : 1);
+      const dmg = def.dmg * falloff * (headshot ? 2 : 1) * (penetrated ? 0.7 : 1);
       this.damageFighter(target, dmg, shooter, headshot, point);
       this.effects.impact(point, 0xff5a5a);
+      this.audio.hit(headshot);
     } else if (point) {
       this.effects.impact(point, 0xd9c9a3);
+      this.audio.wallImpact();
+    } else {
+      // missed entirely — dirt/sand puff if terrain was hit via rayTerrain
+      if (point) this.effects.impact(point, 0xc9b98a);
     }
   }
 

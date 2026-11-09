@@ -101,22 +101,35 @@ export class AudioSys {
   shot(type = 'rifle', volume = 1) {
     if (!this.ctx || this.muted) return;
     const v = volume;
+    const t = this.ctx.currentTime;
+    // layered gunshot: crack + thump + body
     if (type === 'pistol') {
-      this.noise(0.14, 1700, 0.9, 0.5 * v);
-      this.tone(140, 0.12, 0.28 * v, 'square', 0, 55);
+      this.noise(0.08, 2200, 1.4, 0.55 * v);
+      this.noise(0.12, 800, 0.8, 0.35 * v);
+      this.tone(110, 0.09, 0.38 * v, 'square', 0, 60);
     } else if (type === 'smg') {
-      this.noise(0.09, 2400, 1.1, 0.34 * v);
-      this.tone(180, 0.07, 0.16 * v, 'square', 0, 70);
+      this.noise(0.05, 2600, 1.6, 0.38 * v);
+      this.noise(0.07, 1100, 1.0, 0.22 * v);
+      this.tone(170, 0.06, 0.22 * v, 'square', 0, 75);
     } else if (type === 'shotgun') {
-      this.noise(0.32, 900, 0.6, 0.75 * v);
-      this.tone(90, 0.25, 0.4 * v, 'sawtooth', 0, 45);
+      this.noise(0.28, 700, 0.5, 0.85 * v, 'lowpass');
+      this.noise(0.18, 1400, 0.7, 0.5 * v);
+      this.tone(75, 0.22, 0.5 * v, 'sawtooth', 0, 40);
     } else if (type === 'sniper') {
-      this.noise(0.4, 1200, 0.5, 0.8 * v);
-      this.tone(70, 0.35, 0.45 * v, 'sawtooth', 0, 35);
+      this.noise(0.35, 900, 0.4, 0.9 * v, 'lowpass');
+      this.noise(0.12, 3200, 1.8, 0.6 * v);
+      this.tone(55, 0.3, 0.55 * v, 'sawtooth', 0, 32);
     } else {
-      this.noise(0.16, 1900, 0.85, 0.55 * v);
-      this.tone(130, 0.13, 0.3 * v, 'square', 0, 55);
+      // rifle / generic
+      this.noise(0.09, 2100, 1.3, 0.6 * v);
+      this.noise(0.14, 700, 0.7, 0.4 * v);
+      this.tone(125, 0.11, 0.42 * v, 'square', 0, 58);
     }
+  }
+
+  wallImpact() {
+    if (!this.ctx || this.muted) return;
+    this.noise(0.06, 800, 1.2, 0.25, 'bandpass');
   }
 
   hit(headshot = false) {
