@@ -10,7 +10,7 @@ import { HUD } from './hud.js';
 import { Match } from './match.js';
 import { AudioSys } from './audio.js?v=2';
 import { initAuth, getProfile } from './auth.js?v=1';
-import { getSavedProfile, loginWithUsername, loadPlayerData, savePlayerData, lookupPlayerByUsername, loadLeaderboard, loadPlayerMail, claimMail, loadEvents, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, loadFriends, loadFriendRequests } from './firebase.js?v=1';
+import { getSavedProfile, loginWithUsername, loadPlayerData, savePlayerData, lookupPlayerByUsername, loadLeaderboard, loadPlayerMail, claimMail, loadEvents, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, loadFriends, loadFriendRequests, sendDuoInvite, loadDuoInvites, acceptDuoInvite, rejectDuoInvite } from './firebase.js?v=1';
 
 const $ = (s) => document.querySelector(s);
 const clamp = THREE.MathUtils.clamp;
@@ -881,10 +881,20 @@ if (friendsTool) friendsTool.addEventListener('click', () => openPanel('friends'
 if (mailTool) mailTool.addEventListener('click', () => openPanel('mail'));
 
 // invite button
-function startDuoMatch(friend) {
+async function startDuoMatch(friend) {
+  const result = await sendDuoInvite(friend.uid);
+  if (!result.ok) {
+    hud.toast('FAILED TO SEND INVITE', 'warn');
+    return;
+  }
+  // store teamId for when match starts
+  window.__duoTeamId = result.teamId;
+  window.__duoPartner = friend;
+  // enter matchmaking immediately — friend will receive invite when they load/lobby
   duoMode = true;
   refreshModeTabs();
   startMatchmaking();
+  hud.toast('INVITE SENT TO ' + friend.name.toUpperCase() + '. WAITING FOR THEM...', 'good');
 }
 
 function populateInvite() {
@@ -1938,7 +1948,9 @@ async function startMatchmaking() {
   try {
     if (!colyseusClient) colyseusClient = new window.Colyseus.Client(SERVER_URL);
     const profile = getProfile();
-    gameRoom = await colyseusClient.joinOrCreate('game', { name: profile.username || 'PLAYER' });
+    const joinOptions = { name: profile.username || 'PLAYER' };
+    if (duoMode && window.__duoTeamId) joinOptions.teamId = window.__duoTeamId;
+    gameRoom = await colyseusClient.joinOrCreate('game', joinOptions);
   } catch (err) {
     console.error('matchmaking connect failed', err);
     $('#mmStatus').textContent = 'CONNECTION FAILED — PLAYING OFFLINE';
@@ -2319,6 +2331,27 @@ applyAudioSettings();
 selectCharacter(selected);
 resizePreview();
 requestAnimationFrame(animate);
+
+// poll for duo invites while in lobby
+let duoPollTimer = null;
+async function checkDuoInvites() {
+  if (mode !== 'menu' || !loaded) return;
+  const invites = await loadDuoInvites();
+  if (invites.length === 0) return;
+  const inv = invites[0];
+  const ok = window.confirm(`TEAM INVITE FROM ${inv.fromName}\n\nAccept and play DUO together?`);
+  if (ok) {
+    await acceptDuoInvite(inv.fromId, inv.teamId);
+    window.__duoTeamId = inv.teamId;
+    window.__duoPartner = { uid: inv.fromId, name: inv.fromName };
+    duoMode = true;
+    refreshModeTabs();
+    startMatchmaking();
+  } else {
+    await rejectDuoInvite(inv.fromId);
+  }
+}
+duoPollTimer = setInterval(checkDuoInvites, 3000);
 
 // debug / test hooks
 window.DEBUG = {

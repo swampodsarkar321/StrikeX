@@ -356,7 +356,68 @@ export async function loadEvents() {
   }
 }
 
-export async function lookupPlayerByUsername(rawName) {
+export async function sendDuoInvite(targetUid) {
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return { ok: false, reason: 'NOT_LOGGED_IN' };
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return { ok: false, reason: 'OFFLINE' }; }
+  const { db, mod } = bundle;
+  const teamId = 'team_' + Math.random().toString(36).slice(2, 10);
+  const invite = {
+    fromId: profile.uid,
+    fromName: profile.username,
+    teamId,
+    createdAt: Date.now(),
+  };
+  try {
+    await mod.set(mod.ref(db, `${DB_ROOT}/invites/${targetUid}/${profile.uid}`), invite);
+    return { ok: true, teamId };
+  } catch (err) {
+    console.error('sendDuoInvite failed', err);
+    return { ok: false, reason: 'ERROR' };
+  }
+}
+
+export async function loadDuoInvites() {
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return [];
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return []; }
+  const { db, mod } = bundle;
+  try {
+    const snap = await mod.get(mod.ref(db, `${DB_ROOT}/invites/${profile.uid}`));
+    if (!snap.exists()) return [];
+    const invites = [];
+    snap.forEach((child) => {
+      const v = child.val();
+      if (v) invites.push({ ...v, key: child.key });
+    });
+    return invites;
+  } catch (err) {
+    console.error('loadDuoInvites failed', err);
+    return [];
+  }
+}
+
+export async function acceptDuoInvite(fromId, teamId) {
+  const profile = getSavedProfile();
+  if (!profile || !profile.uid) return false;
+  let bundle;
+  try { bundle = await ensureFirebase(); } catch { return false; }
+  const { db, mod } = bundle;
+  try {
+    // remove invite
+    await mod.remove(mod.ref(db, `${DB_ROOT}/invites/${profile.uid}/${fromId}`));
+    return true;
+  } catch (err) {
+    console.error('acceptDuoInvite failed', err);
+    return false;
+  }
+}
+
+export async function rejectDuoInvite(fromId) {
+  return acceptDuoInvite(fromId, null); // reject = same as remove
+}
   const name = String(rawName || '').trim().replace(/\s+/g, '');
   if (!/^[A-Za-z0-9_.]{3,16}$/.test(name)) return null;
   let bundle;
