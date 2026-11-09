@@ -401,24 +401,6 @@ export async function acceptDuoInvite(fromId, teamId) {
 export async function rejectDuoInvite(fromId) {
   return acceptDuoInvite(fromId, null); // reject = same as remove
 }
-  const name = String(rawName || '').trim().replace(/\s+/g, '');
-  if (!/^[A-Za-z0-9_.]{3,16}$/.test(name)) return null;
-  let bundle;
-  try { bundle = await ensureFirebase(); } catch { return null; }
-  const { db, mod } = bundle;
-  try {
-    const nameSnap = await mod.get(mod.ref(db, `${DB_ROOT}/usernames/${name.toLowerCase()}`));
-    if (!nameSnap.exists()) return null;
-    const claim = nameSnap.val();
-    const playerSnap = await mod.get(mod.ref(db, `${DB_ROOT}/players/${claim.uid}`));
-    if (!playerSnap.exists()) return { username: name, uid: claim.uid, online: false };
-    const p = playerSnap.val();
-    return { username: p.name || name, uid: claim.uid, online: !!p.online, lastSeen: p.lastSeen || 0, level: p.level || 1 };
-  } catch (err) {
-    console.warn('[StrikeX] lookup failed', err);
-    return null;
-  }
-}
 export async function lookupPlayerByUsername(rawName) {
   const name = String(rawName || '').trim().replace(/\s+/g, '');
   if (!/^[A-Za-z0-9_.]{3,16}$/.test(name)) return null;
