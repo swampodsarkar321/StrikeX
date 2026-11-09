@@ -262,7 +262,7 @@ export function createGun(weaponId) {
 
 // ------------------------------------------------------------ fighter
 export class Fighter {
-  constructor({ charId, name, scene, isPlayer = false, charColor = '#ff5a5a' }) {
+  constructor({ charId, name, scene, isPlayer = false, charColor = '#ff5a5a', isPartner = false }) {
     this.charId = charId;
     this.name = name;
     this.isPlayer = isPlayer;
@@ -308,6 +308,7 @@ export class Fighter {
     // emote state
     this.emoteT = 0;
     this.emoteId = null;
+    this.isPartner = isPartner;
     this.emoteSprite = null;
 
     // hit volumes
@@ -327,7 +328,7 @@ export class Fighter {
     // floating name tag (bots)
     if (!isPlayer) {
       this.tag = makeNameTag(name, charColor);
-      this.tag.position.y = 1.72;
+      this.tag.position.y = (this.isPartner ? 0.05 : 1.72);
       this.root.add(this.tag);
     }
 

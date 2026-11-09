@@ -161,6 +161,7 @@ export class Match {
         name: 'PARTNER',
         scene: this.scene,
         charColor: '#3ea8ff',
+        isPartner: true,
       });
       b.place(this.player.pos.x + 2, this.player.pos.z + 2);
       b.yaw = Math.random() * TAU;
@@ -1260,8 +1261,8 @@ export class Match {
     b.urgent = dc > 25 || z.state === 'final';
 
     const prev = b.target;
-    b.target = this.findTarget(b);
-    if (b.target && b.target !== prev) b.aimTime = rand(0.45, 0.95);
+    b.target = this.findTargetWide(b);
+    if (b.target && b.target !== prev) b.aimTime = rand(0.4, 0.9);
 
     if (!b.target) {
       // stay near player
@@ -1272,6 +1273,21 @@ export class Match {
     } else {
       b.wander = null;
     }
+  }
+
+  findTargetWide(b) {
+    let best = null, bestScore = Infinity;
+    for (const f of this.fighters) {
+      if (f === b || !f.alive) continue;
+      if (f.isPlayer) continue;
+      const d = Math.hypot(f.pos.x - b.pos.x, f.pos.z - b.pos.z);
+      if (d > 65) continue;
+      // prefer enemies near the player (protect player)
+      const dToPlayer = Math.hypot(f.pos.x - this.player.pos.x, f.pos.z - this.player.pos.z);
+      const score = d * 0.5 + dToPlayer * 0.5 + Math.random() * 3;
+      if (score < bestScore) { bestScore = score; best = f; }
+    }
+    return best;
   }
 
   botThink(b) {

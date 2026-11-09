@@ -105,6 +105,9 @@ function refreshModeTabs() {
   if (d) d.classList.toggle('active', duoMode);
   const sub = $('#startModeSub');
   if (sub) sub.textContent = duoMode ? 'DUO · BERMUDA' : (rankedMode ? 'RANKED' : 'CLASSIC') + ' · BERMUDA';
+  // refresh lobby preview to show 2 characters in duo
+  if (loaded) setPreview(selected);
+  requestAnimationFrame(resizePreview);
 }
 
 // --------------------------------------------------------- leveling system
@@ -329,14 +332,22 @@ pScene.add(pRoot);
 let pMixer = null;
 let pModel = null;
 let pCurrent = '';
+let partnerPreview = null;
+let partnerMixer = null;
 
 function setPreview(charId) {
   if (!loaded || charId === pCurrent) return;
   pCurrent = charId;
+  // clear existing models
   if (pModel) {
     pRoot.remove(pModel.root);
     pModel = null;
     pMixer = null;
+  }
+  if (partnerPreview) {
+    pRoot.remove(partnerPreview.root);
+    partnerPreview = null;
+    partnerMixer = null;
   }
   const cfg = CHARACTERS.find((c) => c.id === charId);
   pModel = createCharacterModel(charId);
@@ -347,7 +358,32 @@ function setPreview(charId) {
     }
   });
   pModel.play('Idle_Neutral', 0);
-  pRoot.add(pModel.root);
+  if (duoMode) {
+    // show two characters side by side
+    pModel.root.position.set(-0.75, 0, 0);
+    pRoot.add(pModel.root);
+    // partner preview: pick a different character index
+    const partnerIdx = (CHARACTERS.findIndex((c) => c.id === charId) + 1) % CHARACTERS.length;
+    const partnerCharId = CHARACTERS[partnerIdx].id;
+    partnerPreview = createCharacterModel(partnerCharId);
+    partnerPreview.root.position.set(0.75, 0, 0);
+    partnerPreview.root.traverse((o) => {
+      if (o.isMesh) {
+        o.castShadow = false;
+        if (o.material) o.material.emissiveIntensity = 0.05;
+      }
+    });
+    partnerPreview.play('Idle_Neutral', 0);
+    pRoot.add(partnerPreview.root);
+    partnerMixer = partnerPreview.mixer;
+    pFill.position.set(0, 1.4, 2.4);
+    pCamera.position.set(0, 1.18, 5.2);
+  } else {
+    pModel.root.position.set(0, 0, 0);
+    pRoot.add(pModel.root);
+    pFill.position.set(-1.6, 1.4, 2.4);
+    pCamera.position.set(0, 1.18, 4.3);
+  }
   pMixer = pModel.mixer;
   glowRing.material.color.set(cfg.color);
   pFill.color.set(cfg.color);
@@ -2280,6 +2316,7 @@ function animate(now) {
 
   if (mode === 'menu') {
     if (pMixer) pMixer.update(dt);
+    if (partnerMixer) partnerMixer.update(dt);
     if (pModel) {
       previewTime += dt;
       pRoot.position.y = Math.sin(previewTime * 1.6) * 0.008;
