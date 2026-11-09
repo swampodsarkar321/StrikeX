@@ -653,6 +653,16 @@
     </footer>
   </div>
 
+  <!-- ===== DUO INVITE TOAST ===== -->
+  <div id="duoInviteToast" class="hidden" style="position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:35;background:linear-gradient(135deg,#1a2332,#0f1621);border:1px solid #ffb648;padding:14px 20px;min-width:300px;text-align:center;clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%);box-shadow:0 8px 32px rgba(255,182,72,0.25);">
+    <div style="font-size:10px;letter-spacing:0.24em;color:#ffb648;margin-bottom:4px;">TEAM INVITE</div>
+    <div style="font-size:14px;font-weight:800;color:#e9f1f7;margin-bottom:8px;"><b id="duoInviteFrom">PLAYER</b> wants to play DUO</div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button id="duoInviteAccept" class="btn primary" style="min-width:100px;padding:8px 18px;font-size:11px;">ACCEPT</button>
+      <button id="duoInviteReject" class="btn ghost" style="min-width:100px;padding:8px 18px;font-size:11px;border:1px solid rgba(255,255,255,0.15);">REJECT</button>
+    </div>
+  </div>
+
   <!-- ===== settings screen ===== -->
   <div id="settingsScreen" class="hidden">
     <header class="set-top">

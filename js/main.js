@@ -2372,23 +2372,43 @@ requestAnimationFrame(animate);
 // poll for duo invites while in lobby
 let duoPollTimer = null;
 async function checkDuoInvites() {
+  // show invites whenever the lobby is visible (menu mode), not during a match
   if (mode !== 'menu' || !loaded) return;
   const invites = await loadDuoInvites();
-  if (invites.length === 0) return;
+  const toastEl = document.getElementById('duoInviteToast');
+  if (invites.length === 0 || !toastEl) {
+    if (toastEl) toastEl.classList.add('hidden');
+    return;
+  }
   const inv = invites[0];
-  const ok = window.confirm(`TEAM INVITE FROM ${inv.fromName}\n\nAccept and play DUO together?`);
-  if (ok) {
+  const fromEl = document.getElementById('duoInviteFrom');
+  if (fromEl) fromEl.textContent = inv.fromName;
+  toastEl.classList.remove('hidden');
+
+  const acceptBtn = document.getElementById('duoInviteAccept');
+  const rejectBtn = document.getElementById('duoInviteReject');
+  if (!acceptBtn || !rejectBtn) return;
+
+  // prevent stacking listeners
+  const newAccept = acceptBtn.cloneNode(true);
+  acceptBtn.replaceWith(newAccept);
+  const newReject = rejectBtn.cloneNode(true);
+  rejectBtn.replaceWith(newReject);
+
+  newAccept.addEventListener('click', async () => {
     await acceptDuoInvite(inv.fromId, inv.teamId);
     window.__duoTeamId = inv.teamId;
-    // fetch partner's data (including charId) from Firebase
     const partnerData = await lookupPlayerByUsername(inv.fromName);
     window.__duoPartner = partnerData || { uid: inv.fromId, name: inv.fromName };
     duoMode = true;
+    toastEl.classList.add('hidden');
     refreshModeTabs();
     startMatchmaking();
-  } else {
+  });
+  newReject.addEventListener('click', async () => {
     await rejectDuoInvite(inv.fromId);
-  }
+    toastEl.classList.add('hidden');
+  });
 }
 duoPollTimer = setInterval(checkDuoInvites, 3000);
 
